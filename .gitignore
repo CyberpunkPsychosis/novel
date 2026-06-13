@@ -1,2 +1,3 @@
 # 导出用的副本，不入库（正文源文件用 .md）
-4-正文/*.txt
+books/*/4-正文/*.txt
+node_modules/
