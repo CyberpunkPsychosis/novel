@@ -272,7 +272,8 @@ async function loadBooks() {
       });
     }
     chapters.sort((a, b) => (a.num ?? 1e9) - (b.num ?? 1e9));
-    books.push({ dir, meta, chapters });
+    const coverFile = meta.cover ? path.basename(meta.cover) : "cover.svg";
+    books.push({ dir, meta, chapters, coverFile });
   }
   // 章节多的书排前面
   books.sort((a, b) => b.chapters.length - a.chapters.length);
@@ -303,7 +304,7 @@ async function build() {
   const cards = books
     .map((b) => {
       const m = b.meta;
-      const coverSrc = m.cover ? m.cover : `books/${m.slug}/cover.svg`;
+      const coverSrc = `books/${m.slug}/${b.coverFile}`;
       return `<a class="book" href="books/${m.slug}/index.html">
   <img class="cover" src="${escapeAttr(coverSrc)}" alt="${escapeAttr(m.title)} 封面">
   <div class="meta">
@@ -334,12 +335,17 @@ ${footerHtml}`;
     const bookDir = path.join(OUT_DIR, "books", m.slug);
     await fs.mkdir(bookDir, { recursive: true });
 
-    if (!m.cover) {
+    if (m.cover) {
+      await fs.copyFile(
+        path.join(BOOKS_DIR, b.dir, m.cover),
+        path.join(bookDir, b.coverFile)
+      );
+    } else {
       await fs.writeFile(path.join(bookDir, "cover.svg"), svgCover(m));
     }
 
     const totalWords = b.chapters.reduce((s, c) => s + c.words, 0);
-    const coverSrc = m.cover ? `../../${m.cover}` : "cover.svg";
+    const coverSrc = b.coverFile;
 
     const tocItems = b.chapters
       .map((c) => {
