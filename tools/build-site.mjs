@@ -80,44 +80,77 @@ function parseChapterFile(name) {
   return { num: null, name: base };
 }
 
-// 生成 SVG 封面（无版权风险，可被 book.json 的 cover 覆盖）。
+// 生成网文风格的 SVG 封面（无版权风险，可被 book.json 的 cover 覆盖）。
+// 主视觉：一只发光的眼睛 + 横排大字标题 + 钩子文案，渲染出网文封面的张力。
 function svgCover(book) {
-  const [c1, c2, c3] = book.coverColors || ["#1f2937", "#374151", "#4b5563"];
+  const [c1, c2, c3] = book.coverColors || ["#05060a", "#0f2027", "#1a3a2e"];
   const accent = book.coverAccent || "#e8c477";
   const title = escapeHtml(book.title);
   const author = escapeHtml(book.author || "");
-  const tag = escapeHtml((book.tags || [])[0] || "");
-  // 标题竖排（每字一行），适合中文书名。
-  const chars = [...book.title];
-  const titleSpans = chars
-    .map(
-      (ch, i) =>
-        `<text x="300" y="${250 + i * 92}" class="t">${escapeHtml(ch)}</text>`
-    )
-    .join("");
+  const tagline = escapeHtml(book.tagline || "");
+  const topTag = escapeHtml((book.tags || []).slice(0, 3).join("　"));
+  const n = [...book.title].length;
+  const titleSize = n <= 2 ? 168 : n <= 4 ? 116 : n <= 6 ? 84 : 64;
+
+  // 眼睛主视觉的放射光线
+  const rays = Array.from({ length: 24 }, (_, i) => {
+    const a = (i / 24) * Math.PI * 2;
+    const r1 = 92, r2 = 92 + (i % 2 ? 26 : 46);
+    const x1 = 300 + Math.cos(a) * r1, y1 = 300 + Math.sin(a) * r1;
+    const x2 = 300 + Math.cos(a) * r2, y2 = 300 + Math.sin(a) * r2;
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${accent}" stroke-width="2" stroke-opacity="0.5"/>`;
+  }).join("");
+
   return `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" role="img" aria-label="${escapeAttr(title)}">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${c1}"/>
-      <stop offset="0.55" stop-color="${c2}"/>
-      <stop offset="1" stop-color="${c3}"/>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="${c3}"/>
+      <stop offset="0.5" stop-color="${c2}"/>
+      <stop offset="1" stop-color="${c1}"/>
+    </radialGradient>
+    <radialGradient id="iris" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff7e0"/>
+      <stop offset="0.35" stop-color="${accent}"/>
+      <stop offset="1" stop-color="#7a4e16"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff3cf"/>
+      <stop offset="0.5" stop-color="${accent}"/>
+      <stop offset="1" stop-color="#b07d2c"/>
     </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
+
   <rect width="600" height="800" fill="url(#bg)"/>
-  <rect x="28" y="28" width="544" height="744" fill="none" stroke="${accent}" stroke-opacity="0.55" stroke-width="2"/>
-  <g opacity="0.9">
-    <ellipse cx="300" cy="650" rx="120" ry="60" fill="none" stroke="${accent}" stroke-width="3"/>
-    <circle cx="300" cy="650" r="34" fill="none" stroke="${accent}" stroke-width="3"/>
-    <circle cx="300" cy="650" r="13" fill="${accent}"/>
+  <rect x="22" y="22" width="556" height="756" fill="none" stroke="${accent}" stroke-opacity="0.45" stroke-width="1.5"/>
+
+  ${topTag ? `<text x="300" y="92" class="tag">${topTag}</text>` : ""}
+
+  <!-- 眼睛主视觉 -->
+  <g filter="url(#glow)">
+    ${rays}
+    <path d="M170 300 Q300 196 430 300 Q300 404 170 300 Z" fill="none" stroke="${accent}" stroke-width="4"/>
+    <circle cx="300" cy="300" r="60" fill="url(#iris)"/>
+    <circle cx="300" cy="300" r="26" fill="#0a0a0a"/>
+    <circle cx="283" cy="284" r="9" fill="#fff" opacity="0.9"/>
   </g>
+
+  <!-- 标题 -->
+  <text x="300" y="568" class="title" style="font-size:${titleSize}px">${title}</text>
+  ${tagline ? `<text x="300" y="628" class="tagline">${tagline}</text>` : ""}
+
+  <line x1="200" y1="690" x2="400" y2="690" stroke="${accent}" stroke-opacity="0.6" stroke-width="1.5"/>
+  ${author ? `<text x="300" y="742" class="author">${author}</text>` : ""}
+
   <style>
-    .t { fill: #fff; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 78px; font-weight: 700; text-anchor: middle; letter-spacing: 2px; }
-    .a { fill: ${accent}; font-family: 'Noto Serif SC',serif; font-size: 26px; text-anchor: middle; letter-spacing: 4px; }
-    .g { fill: #ffffffcc; font-family: sans-serif; font-size: 22px; text-anchor: middle; letter-spacing: 6px; }
+    .title { fill: url(#gold); font-family: 'Noto Serif SC','Songti SC',serif; font-weight: 700; text-anchor: middle; letter-spacing: 6px; stroke: #2a1c06; stroke-width: 1px; paint-order: stroke; }
+    .tagline { fill: #f3ead6; font-family: 'Noto Serif SC',serif; font-size: 30px; text-anchor: middle; letter-spacing: 4px; }
+    .tag { fill: ${accent}; fill-opacity: 0.85; font-family: sans-serif; font-size: 22px; text-anchor: middle; letter-spacing: 4px; }
+    .author { fill: #cdbfa6; font-family: 'Noto Serif SC',serif; font-size: 24px; text-anchor: middle; letter-spacing: 3px; }
   </style>
-  ${titleSpans}
-  ${tag ? `<text x="300" y="120" class="g">${tag}</text>` : ""}
-  ${author ? `<text x="300" y="745" class="a">${author}</text>` : ""}
 </svg>`;
 }
 

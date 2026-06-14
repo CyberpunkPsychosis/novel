@@ -1,24 +1,51 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800" role="img" aria-label="法眼">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f2027"/>
-      <stop offset="0.55" stop-color="#203a43"/>
-      <stop offset="1" stop-color="#2c5364"/>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#1a3a2e"/>
+      <stop offset="0.5" stop-color="#0f2027"/>
+      <stop offset="1" stop-color="#05060a"/>
+    </radialGradient>
+    <radialGradient id="iris" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff7e0"/>
+      <stop offset="0.35" stop-color="#e8c477"/>
+      <stop offset="1" stop-color="#7a4e16"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff3cf"/>
+      <stop offset="0.5" stop-color="#e8c477"/>
+      <stop offset="1" stop-color="#b07d2c"/>
     </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
+
   <rect width="600" height="800" fill="url(#bg)"/>
-  <rect x="28" y="28" width="544" height="744" fill="none" stroke="#e8c477" stroke-opacity="0.55" stroke-width="2"/>
-  <g opacity="0.9">
-    <ellipse cx="300" cy="650" rx="120" ry="60" fill="none" stroke="#e8c477" stroke-width="3"/>
-    <circle cx="300" cy="650" r="34" fill="none" stroke="#e8c477" stroke-width="3"/>
-    <circle cx="300" cy="650" r="13" fill="#e8c477"/>
+  <rect x="22" y="22" width="556" height="756" fill="none" stroke="#e8c477" stroke-opacity="0.45" stroke-width="1.5"/>
+
+  <text x="300" y="92" class="tag">都市　鉴宝　扮猪吃虎</text>
+
+  <!-- 眼睛主视觉 -->
+  <g filter="url(#glow)">
+    <line x1="392.0" y1="300.0" x2="438.0" y2="300.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="388.9" y1="323.8" x2="414.0" y2="330.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="379.7" y1="346.0" x2="419.5" y2="369.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="365.1" y1="365.1" x2="383.4" y2="383.4" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="346.0" y1="379.7" x2="369.0" y2="419.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="323.8" y1="388.9" x2="330.5" y2="414.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="300.0" y1="392.0" x2="300.0" y2="438.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="276.2" y1="388.9" x2="269.5" y2="414.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="254.0" y1="379.7" x2="231.0" y2="419.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="234.9" y1="365.1" x2="216.6" y2="383.4" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="220.3" y1="346.0" x2="180.5" y2="369.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="211.1" y1="323.8" x2="186.0" y2="330.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="208.0" y1="300.0" x2="162.0" y2="300.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="211.1" y1="276.2" x2="186.0" y2="269.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="220.3" y1="254.0" x2="180.5" y2="231.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="234.9" y1="234.9" x2="216.6" y2="216.6" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="254.0" y1="220.3" x2="231.0" y2="180.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="276.2" y1="211.1" x2="269.5" y2="186.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="300.0" y1="208.0" x2="300.0" y2="162.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="323.8" y1="211.1" x2="330.5" y2="186.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="346.0" y1="220.3" x2="369.0" y2="180.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="365.1" y1="234.9" x2="383.4" y2="216.6" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="379.7" y1="254.0" x2="419.5" y2="231.0" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/><line x1="388.9" y1="276.2" x2="414.0" y2="269.5" stroke="#e8c477" stroke-width="2" stroke-opacity="0.5"/>
+    <path d="M170 300 Q300 196 430 300 Q300 404 170 300 Z" fill="none" stroke="#e8c477" stroke-width="4"/>
+    <circle cx="300" cy="300" r="60" fill="url(#iris)"/>
+    <circle cx="300" cy="300" r="26" fill="#0a0a0a"/>
+    <circle cx="283" cy="284" r="9" fill="#fff" opacity="0.9"/>
   </g>
+
+  <!-- 标题 -->
+  <text x="300" y="568" class="title" style="font-size:168px">法眼</text>
+  <text x="300" y="628" class="tagline">鉴宝捡漏 · 扮猪吃虎</text>
+
+  <line x1="200" y1="690" x2="400" y2="690" stroke="#e8c477" stroke-opacity="0.6" stroke-width="1.5"/>
+  <text x="300" y="742" class="author">笔名待定</text>
+
   <style>
-    .t { fill: #fff; font-family: 'Noto Serif SC','Songti SC',serif; font-size: 78px; font-weight: 700; text-anchor: middle; letter-spacing: 2px; }
-    .a { fill: #e8c477; font-family: 'Noto Serif SC',serif; font-size: 26px; text-anchor: middle; letter-spacing: 4px; }
-    .g { fill: #ffffffcc; font-family: sans-serif; font-size: 22px; text-anchor: middle; letter-spacing: 6px; }
+    .title { fill: url(#gold); font-family: 'Noto Serif SC','Songti SC',serif; font-weight: 700; text-anchor: middle; letter-spacing: 6px; stroke: #2a1c06; stroke-width: 1px; paint-order: stroke; }
+    .tagline { fill: #f3ead6; font-family: 'Noto Serif SC',serif; font-size: 30px; text-anchor: middle; letter-spacing: 4px; }
+    .tag { fill: #e8c477; fill-opacity: 0.85; font-family: sans-serif; font-size: 22px; text-anchor: middle; letter-spacing: 4px; }
+    .author { fill: #cdbfa6; font-family: 'Noto Serif SC',serif; font-size: 24px; text-anchor: middle; letter-spacing: 3px; }
   </style>
-  <text x="300" y="250" class="t">法</text><text x="300" y="342" class="t">眼</text>
-  <text x="300" y="120" class="g">都市</text>
-  <text x="300" y="745" class="a">笔名待定</text>
 </svg>
