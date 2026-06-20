@@ -2,17 +2,22 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>第004章 一块田黄打的脸 - 法眼</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+<script>(function(){var d=document.documentElement,g=function(k,v){try{return localStorage.getItem(k)||v}catch(e){return v}};d.dataset.theme=g('qj-theme','paper');d.dataset.font=g('qj-font','song');d.dataset.lh=g('qj-lh','normal');d.dataset.fs=g('qj-fs','m');})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../../assets/style.css">
 </head>
 <body>
-<div class="topbar"><div class="wrap"><a href="index.html">法眼 · 目录</a><span class="tools"><button onclick="__fs('')">小</button><button onclick="__fs('fs-l')">中</button><button onclick="__fs('fs-xl')">大</button></span></div></div>
-<main class="wrap">
-  <article>
-    <h1 class="title">第004章 一块田黄打的脸</h1>
-    <p class="sub">法眼 · 2506 字</p>
+<div class="reader" id="reader">
+  <header class="r-appbar">
+    <a class="ic" href="index.html" aria-label="返回目录">‹</a>
+    <span class="t">法眼</span>
+  </header>
+  <main class="page" id="page">
+    <article>
+      <h1 class="title">第004章 一块田黄打的脸</h1>
+      <p class="sub">法眼 · 2506字</p>
 <p>回到城中村那间十平米的出租屋，陈默关好门，第一件事就是打来一盆温水。</p>
 <p>他没敢把那方印章整个洗。</p>
 <p>行里的规矩，老物件的包浆、皮壳轻易动不得，洗过了头，反而毁了它的价值。他只用棉签蘸了点温水，在印章一角，极小心地、一点一点把那层干硬的墨垢揭开了指甲盖大的一小块。</p>
@@ -110,19 +115,63 @@
 <p>他低声开口，像是对自己说，又像是对怀里那面镜子说：</p>
 <p>"爸，等我。"</p>
 <p>"我去把当年的事，一件一件，看清楚。"</p>
-  </article>
-  <nav class="nav">
-  <a href="chapter-003.html">← 上一章</a>
-  <a href="index.html">目录</a>
-  <a href="chapter-005.html">下一章 →</a>
-</nav>
-</main>
-<footer class="site">人机协作 · 持续连载</footer>
+      <p class="chap-end">— 本章完 —</p>
+    </article>
+  </main>
+  <nav class="r-botbar">
+    <a href="chapter-003.html"><span class="ic">‹</span><span>上一章</span></a>
+    <a href="index.html"><span class="ic">☰</span><span>目录</span></a>
+    <button onclick="__openSet()"><span class="ic">Aa</span><span>设置</span></button>
+    <a href="chapter-005.html"><span class="ic">›</span><span>下一章</span></a>
+  </nav>
+  <div class="mask" id="mask"></div>
+<section class="sheet" id="sheet">
+  <h4>阅读设置</h4>
+  <div class="row"><span class="lab">字号</span><div class="seg">
+    <button data-opt="fs" data-val="s" onclick="__qj.fs('s')">小</button>
+    <button data-opt="fs" data-val="m" onclick="__qj.fs('m')">标准</button>
+    <button data-opt="fs" data-val="l" onclick="__qj.fs('l')">大</button>
+    <button data-opt="fs" data-val="xl" onclick="__qj.fs('xl')">特大</button>
+  </div></div>
+  <div class="row"><span class="lab">背景</span><div class="sw">
+    <button class="b-paper" data-opt="theme" data-val="paper" onclick="__qj.theme('paper')">米白</button>
+    <button class="b-eye" data-opt="theme" data-val="eye" onclick="__qj.theme('eye')">护眼</button>
+    <button class="b-yellow" data-opt="theme" data-val="yellow" onclick="__qj.theme('yellow')">纸黄</button>
+    <button class="b-night" data-opt="theme" data-val="night" onclick="__qj.theme('night')">夜间</button>
+  </div></div>
+  <div class="row"><span class="lab">字体</span><div class="seg">
+    <button data-opt="font" data-val="song" onclick="__qj.font('song')">宋体</button>
+    <button data-opt="font" data-val="hei" onclick="__qj.font('hei')">黑体</button>
+    <button data-opt="font" data-val="kai" onclick="__qj.font('kai')">楷体</button>
+  </div></div>
+  <div class="row"><span class="lab">行距</span><div class="seg">
+    <button data-opt="lh" data-val="tight" onclick="__qj.lh('tight')">紧凑</button>
+    <button data-opt="lh" data-val="normal" onclick="__qj.lh('normal')">适中</button>
+    <button data-opt="lh" data-val="loose" onclick="__qj.lh('loose')">宽松</button>
+  </div></div>
+</section>
+</div>
 <script>
 (function(){
-  var b=document.body, k='reader-fs';
-  var s=localStorage.getItem(k); if(s) b.classList.add(s);
-  window.__fs=function(c){['fs-l','fs-xl'].forEach(function(x){b.classList.remove(x)});if(c)b.classList.add(c);localStorage.setItem(k,c||'');};
+  var d=document.documentElement, reader=document.getElementById('reader');
+  function sync(){
+    document.querySelectorAll('[data-opt]').forEach(function(el){
+      el.classList.toggle('on', d.dataset[el.getAttribute('data-opt')]===el.getAttribute('data-val'));
+    });
+  }
+  function set(k,a,v){d.dataset[a]=v;try{localStorage.setItem(k,v)}catch(e){}sync();}
+  window.__qj={theme:function(v){set('qj-theme','theme',v)},font:function(v){set('qj-font','font',v)},lh:function(v){set('qj-lh','lh',v)},fs:function(v){set('qj-fs','fs',v)}};
+  var mask=document.getElementById('mask'),sheet=document.getElementById('sheet');
+  window.__openSet=function(){mask.classList.add('on');sheet.classList.add('on')};
+  window.__closeSet=function(){mask.classList.remove('on');sheet.classList.remove('on')};
+  mask&&mask.addEventListener('click',window.__closeSet);
+  var page=document.getElementById('page');
+  page&&page.addEventListener('click',function(e){
+    if(e.target.closest('a,button')) return;
+    if(window.getSelection&&String(window.getSelection()).length) return;
+    reader.classList.toggle('bars-off');
+  });
+  sync();
 })();
 </script>
 </body>

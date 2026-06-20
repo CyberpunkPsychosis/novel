@@ -156,62 +156,162 @@ function svgCover(book) {
 
 // ---------- 页面模板 ----------
 
-const CSS = `:root{--bg:#faf8f4;--fg:#26211c;--muted:#7d756b;--card:#fff;--line:#e8e1d6;--accent:#9a6a3a;--accent2:#c08a4a}
-@media (prefers-color-scheme:dark){:root{--bg:#16130f;--fg:#e6ddd0;--muted:#9a9085;--card:#1f1b16;--line:#332c24;--accent:#d6a86a;--accent2:#e8c477}}
+// 「青简 · 墨白」移动端阅读设计系统（依据作者设计稿落地）。
+const CSS = `:root,:root[data-theme=paper]{--bg:#F4EFE4;--fg:#211C17;--muted:#8A8175;--card:#FBF8F1;--line:rgba(33,28,23,.10);--accent:#B0392B;--soft:rgba(176,57,43,.10)}
+:root[data-theme=eye]{--bg:#DEE7D4;--fg:#22302A;--muted:#6E7A6B;--card:#E7EEDF;--line:rgba(34,48,42,.12);--accent:#4F7A52;--soft:rgba(79,122,82,.14)}
+:root[data-theme=yellow]{--bg:#F2E4C9;--fg:#3A2F1E;--muted:#8A7A5E;--card:#F8EED9;--line:rgba(58,47,30,.12);--accent:#B0392B;--soft:rgba(176,57,43,.10)}
+:root[data-theme=night]{--bg:#16191B;--fg:#C7C0B3;--muted:#6B6359;--card:#1E2225;--line:rgba(255,255,255,.08);--accent:#C97A5A;--soft:rgba(201,122,90,.16)}
 *{box-sizing:border-box}
-html{font-size:18px}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:'Noto Serif SC',Georgia,'Songti SC',serif;line-height:1.85;-webkit-font-smoothing:antialiased}
-a{color:var(--accent);text-decoration:none}
-a:hover{color:var(--accent2)}
-.wrap{max-width:760px;margin:0 auto;padding:0 20px}
-header.site{text-align:center;padding:48px 20px 24px}
-header.site h1{margin:0;font-size:2rem;letter-spacing:4px}
-header.site p{margin:8px 0 0;color:var(--muted);letter-spacing:2px}
-.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:28px;max-width:980px;margin:32px auto 64px;padding:0 20px}
-.book{display:block;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:transform .15s,box-shadow .15s}
-.book:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(0,0,0,.18)}
-.book .cover{aspect-ratio:3/4;width:100%;object-fit:cover;display:block;background:#222}
-.book .meta{padding:12px 14px 16px}
-.book .meta .bt{font-size:1.1rem;font-weight:700;color:var(--fg);margin:0 0 4px}
-.book .meta .bd{font-size:.82rem;color:var(--muted);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-.badge{display:inline-block;font-size:.72rem;color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:1px 9px;margin-top:8px}
-.bookhead{display:flex;gap:24px;align-items:flex-start;padding:32px 0 8px;flex-wrap:wrap}
-.bookhead img{width:170px;border-radius:10px;border:1px solid var(--line)}
-.bookhead .info{flex:1;min-width:220px}
-.bookhead h1{margin:.2em 0}
-.bookhead .blurb{color:var(--fg);opacity:.9}
-.tags span{display:inline-block;font-size:.78rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:0 6px 6px 0}
-.toc{list-style:none;padding:0;margin:24px 0 64px;border-top:1px solid var(--line)}
-.toc li a{display:flex;justify-content:space-between;gap:12px;padding:14px 4px;border-bottom:1px solid var(--line);color:var(--fg)}
-.toc li a:hover{color:var(--accent);background:rgba(154,106,58,.06)}
-.toc .cn{color:var(--muted);font-size:.82rem;font-variant-numeric:tabular-nums}
-article{padding:24px 0 40px}
-article h1.title{font-size:1.6rem;text-align:center;margin:8px 0 4px;letter-spacing:2px}
-article .sub{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:32px}
-article p{margin:0 0 1.4em;text-indent:2em}
-article h2{font-size:1.2rem;margin:2em 0 1em;text-align:center}
-article h3{font-size:1.05rem;margin:1.6em 0 .8em}
-hr.break{border:none;text-align:center;margin:2.2em 0}
-hr.break::before{content:"❉";color:var(--accent);font-size:1.1rem;letter-spacing:6px}
-.nav{display:flex;justify-content:space-between;gap:12px;margin:8px 0 56px}
-.nav a,.nav span{flex:1;text-align:center;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
-.nav span{color:var(--muted);opacity:.5}
-.topbar{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:52px}
-.topbar a{font-size:.9rem}
-.tools button{font:inherit;font-size:.85rem;background:none;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:4px 10px;cursor:pointer;margin-left:6px}
-.tools button:hover{color:var(--accent);border-color:var(--accent)}
-footer.site{text-align:center;color:var(--muted);font-size:.8rem;padding:32px 20px 56px;letter-spacing:2px}
-body.fs-l article{font-size:1.12rem}
-body.fs-xl article{font-size:1.25rem}`;
+html{font-size:17px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:'Noto Sans SC',-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+a{color:inherit;text-decoration:none}
 
-const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">`;
+/* 顶部品牌 */
+.brand{text-align:center;padding:40px 20px 14px}
+.brand .logo{font-family:'Noto Serif SC',serif;font-size:1.75rem;letter-spacing:8px;color:var(--fg)}
+.brand .logo b{color:var(--accent);font-weight:700}
+.brand .sub{margin-top:9px;font-size:.76rem;letter-spacing:4px;color:var(--muted)}
+.brand .rule{width:38px;height:2px;background:var(--accent);opacity:.7;margin:14px auto 0;border-radius:2px}
+
+/* 书架 */
+.shelf{display:grid;grid-template-columns:repeat(auto-fill,minmax(146px,1fr));gap:24px 18px;max-width:880px;margin:22px auto 80px;padding:0 18px}
+.book{display:block}
+.book .cover{aspect-ratio:3/4;width:100%;object-fit:cover;display:block;border-radius:6px;background:#2a2620;box-shadow:0 6px 16px rgba(33,28,23,.20)}
+.book .bt{font-family:'Noto Serif SC',serif;font-size:1.02rem;font-weight:700;margin:10px 2px 2px;color:var(--fg)}
+.book .bd{font-size:.76rem;color:var(--muted);line-height:1.5;margin:0 2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.book .badge{display:inline-block;font-size:.68rem;color:var(--accent);margin:6px 2px 0;letter-spacing:1px}
+
+/* 通用顶栏 */
+.appbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;height:50px;padding:0 12px;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.appbar .ic{font-size:1.5rem;line-height:1;color:var(--fg);width:30px;text-align:center}
+.appbar .t{flex:1;font-size:.95rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appbar .r{font-size:.74rem;color:var(--muted)}
+
+/* 书页详情 + 目录 */
+.wrap{max-width:720px;margin:0 auto;padding:0 20px}
+.bookhead{display:flex;gap:18px;align-items:flex-start;padding:24px 0 6px}
+.bookhead img{width:122px;border-radius:6px;box-shadow:0 6px 18px rgba(33,28,23,.24)}
+.bookhead .info{flex:1;min-width:0}
+.bookhead h1{font-family:'Noto Serif SC',serif;margin:2px 0 6px;font-size:1.4rem;letter-spacing:1px}
+.bookhead .by{font-size:.8rem;color:var(--muted)}
+.tags{margin:10px 0 0}
+.tags span{display:inline-block;font-size:.72rem;color:var(--accent);background:var(--soft);border-radius:2px;padding:2px 8px;margin:0 6px 6px 0}
+.blurb{color:var(--fg);opacity:.88;font-size:.92rem;line-height:1.85;margin:16px 0 4px}
+.toc-h{display:flex;align-items:center;gap:12px;margin:24px 0 2px;color:var(--muted);font-size:.78rem;letter-spacing:3px}
+.toc-h::before,.toc-h::after{content:"";flex:1;height:1px;background:var(--line)}
+.toc{list-style:none;padding:0;margin:6px 0 80px}
+.toc li a{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:15px 4px;border-bottom:1px solid var(--line)}
+.toc li a .nm{font-size:.95rem;color:var(--fg)}
+.toc li a .cn{color:var(--muted);font-size:.72rem;font-variant-numeric:tabular-nums;flex:none}
+.toc li a:active{background:var(--soft)}
+
+/* 阅读页 */
+.reader{min-height:100vh}
+.r-appbar{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;align-items:center;gap:10px;height:50px;padding:0 12px;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);transition:transform .25s}
+.r-appbar .ic{font-size:1.5rem;line-height:1;width:28px;text-align:center}
+.r-appbar .t{flex:1;font-size:.88rem;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.page{max-width:680px;margin:0 auto;padding:72px 22px 96px}
+article{font-family:'Noto Serif SC',serif}
+article h1.title{font-family:'Noto Serif SC',serif;font-size:1.4rem;text-align:center;margin:6px 0 6px;letter-spacing:1px;line-height:1.5}
+article .sub{text-align:center;color:var(--muted);font-size:.74rem;letter-spacing:1px}
+article .sub::after{content:"";display:block;width:28px;height:2px;background:var(--accent);opacity:.55;margin:14px auto 30px;border-radius:2px}
+article p{margin:0 0 1.1em;text-indent:2em}
+article h2{font-family:'Noto Serif SC',serif;font-size:1.12rem;margin:1.9em 0 1em;text-align:center}
+article h3{font-size:1.02rem;margin:1.5em 0 .7em}
+hr.break{border:none;text-align:center;margin:2em 0}
+hr.break::before{content:"❖";color:var(--accent);opacity:.5;font-size:.9rem;letter-spacing:6px}
+.chap-end{text-align:center;color:var(--muted);font-size:.76rem;margin:38px 0 0;letter-spacing:3px}
+:root[data-font=song] article{font-family:'Noto Serif SC','Songti SC',serif}
+:root[data-font=hei] article{font-family:'Noto Sans SC',sans-serif}
+:root[data-font=kai] article{font-family:'Kaiti SC','STKaiti','KaiTi','Noto Serif SC',serif}
+:root[data-lh=tight] article p{line-height:1.65}
+:root[data-lh=normal] article p{line-height:1.95}
+:root[data-lh=loose] article p{line-height:2.3}
+:root[data-fs=s] article{font-size:.95rem}
+:root[data-fs=m] article{font-size:1.08rem}
+:root[data-fs=l] article{font-size:1.22rem}
+:root[data-fs=xl] article{font-size:1.36rem}
+
+/* 底部工具条 */
+.r-botbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;height:calc(56px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line);transition:transform .25s}
+.r-botbar a,.r-botbar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:0;color:var(--fg);font-family:inherit;font-size:.68rem;cursor:pointer}
+.r-botbar .ic{font-size:1.15rem;line-height:1}
+.r-botbar .dim{color:var(--muted);opacity:.4}
+.reader.bars-off .r-appbar{transform:translateY(-100%)}
+.reader.bars-off .r-botbar{transform:translateY(100%)}
+
+/* 设置面板 */
+.mask{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.32);opacity:0;visibility:hidden;transition:opacity .25s}
+.mask.on{opacity:1;visibility:visible}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--card);border-top:1px solid var(--line);border-radius:16px 16px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));transform:translateY(115%);transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 -8px 30px rgba(0,0,0,.20)}
+.sheet.on{transform:translateY(0)}
+.sheet h4{margin:2px 0 16px;font-size:.86rem;color:var(--fg);text-align:center;letter-spacing:3px;font-weight:500}
+.row{display:flex;align-items:center;margin:0 0 15px;gap:10px}
+.row .lab{width:34px;flex:none;font-size:.78rem;color:var(--muted)}
+.seg{flex:1;display:flex;gap:8px}
+.seg button{flex:1;padding:9px 4px;border:1px solid var(--line);background:transparent;color:var(--fg);border-radius:8px;font-family:inherit;font-size:.82rem;cursor:pointer;transition:.15s}
+.seg button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sw{flex:1;display:flex;gap:10px}
+.sw button{flex:1;height:40px;border-radius:8px;border:2px solid var(--line);cursor:pointer;font-family:inherit;font-size:.72rem;color:#211C17}
+.sw button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.sw .b-paper{background:#F4EFE4}.sw .b-eye{background:#DEE7D4}.sw .b-yellow{background:#F2E4C9}.sw .b-night{background:#16191B;color:#C7C0B3}
+
+footer.site{text-align:center;color:var(--muted);font-size:.72rem;padding:8px 20px 30px;letter-spacing:2px}`;
+
+const FONTS = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">`;
+
+// 在 <head> 早执行：读取本地存储的阅读偏好，防止首屏闪烁。
+const BOOT = `<script>(function(){var d=document.documentElement,g=function(k,v){try{return localStorage.getItem(k)||v}catch(e){return v}};d.dataset.theme=g('qj-theme','paper');d.dataset.font=g('qj-font','song');d.dataset.lh=g('qj-lh','normal');d.dataset.fs=g('qj-fs','m');})();</script>`;
+
+// 阅读页底部「阅读设置」面板。
+const SETTINGS_SHEET = `<div class="mask" id="mask"></div>
+<section class="sheet" id="sheet">
+  <h4>阅读设置</h4>
+  <div class="row"><span class="lab">字号</span><div class="seg">
+    <button data-opt="fs" data-val="s" onclick="__qj.fs('s')">小</button>
+    <button data-opt="fs" data-val="m" onclick="__qj.fs('m')">标准</button>
+    <button data-opt="fs" data-val="l" onclick="__qj.fs('l')">大</button>
+    <button data-opt="fs" data-val="xl" onclick="__qj.fs('xl')">特大</button>
+  </div></div>
+  <div class="row"><span class="lab">背景</span><div class="sw">
+    <button class="b-paper" data-opt="theme" data-val="paper" onclick="__qj.theme('paper')">米白</button>
+    <button class="b-eye" data-opt="theme" data-val="eye" onclick="__qj.theme('eye')">护眼</button>
+    <button class="b-yellow" data-opt="theme" data-val="yellow" onclick="__qj.theme('yellow')">纸黄</button>
+    <button class="b-night" data-opt="theme" data-val="night" onclick="__qj.theme('night')">夜间</button>
+  </div></div>
+  <div class="row"><span class="lab">字体</span><div class="seg">
+    <button data-opt="font" data-val="song" onclick="__qj.font('song')">宋体</button>
+    <button data-opt="font" data-val="hei" onclick="__qj.font('hei')">黑体</button>
+    <button data-opt="font" data-val="kai" onclick="__qj.font('kai')">楷体</button>
+  </div></div>
+  <div class="row"><span class="lab">行距</span><div class="seg">
+    <button data-opt="lh" data-val="tight" onclick="__qj.lh('tight')">紧凑</button>
+    <button data-opt="lh" data-val="normal" onclick="__qj.lh('normal')">适中</button>
+    <button data-opt="lh" data-val="loose" onclick="__qj.lh('loose')">宽松</button>
+  </div></div>
+</section>`;
 
 const READER_JS = `<script>
 (function(){
-  var b=document.body, k='reader-fs';
-  var s=localStorage.getItem(k); if(s) b.classList.add(s);
-  window.__fs=function(c){['fs-l','fs-xl'].forEach(function(x){b.classList.remove(x)});if(c)b.classList.add(c);localStorage.setItem(k,c||'');};
+  var d=document.documentElement, reader=document.getElementById('reader');
+  function sync(){
+    document.querySelectorAll('[data-opt]').forEach(function(el){
+      el.classList.toggle('on', d.dataset[el.getAttribute('data-opt')]===el.getAttribute('data-val'));
+    });
+  }
+  function set(k,a,v){d.dataset[a]=v;try{localStorage.setItem(k,v)}catch(e){}sync();}
+  window.__qj={theme:function(v){set('qj-theme','theme',v)},font:function(v){set('qj-font','font',v)},lh:function(v){set('qj-lh','lh',v)},fs:function(v){set('qj-fs','fs',v)}};
+  var mask=document.getElementById('mask'),sheet=document.getElementById('sheet');
+  window.__openSet=function(){mask.classList.add('on');sheet.classList.add('on')};
+  window.__closeSet=function(){mask.classList.remove('on');sheet.classList.remove('on')};
+  mask&&mask.addEventListener('click',window.__closeSet);
+  var page=document.getElementById('page');
+  page&&page.addEventListener('click',function(e){
+    if(e.target.closest('a,button')) return;
+    if(window.getSelection&&String(window.getSelection()).length) return;
+    reader.classList.toggle('bars-off');
+  });
+  sync();
 })();
 </script>`;
 
@@ -221,8 +321,9 @@ function page({ title, body, depth, fonts = true }) {
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${escapeHtml(title)}</title>
+${BOOT}
 ${fonts ? FONTS : ""}
 <link rel="stylesheet" href="${base}assets/style.css">
 </head>
@@ -307,18 +408,17 @@ async function build() {
       const coverSrc = `books/${m.slug}/${b.coverFile}`;
       return `<a class="book" href="books/${m.slug}/index.html">
   <img class="cover" src="${escapeAttr(coverSrc)}" alt="${escapeAttr(m.title)} 封面">
-  <div class="meta">
-    <p class="bt">${escapeHtml(m.title)}</p>
-    <p class="bd">${escapeHtml(m.blurb || "")}</p>
-    <span class="badge">${escapeHtml(m.status || "")} · ${b.chapters.length} 章</span>
-  </div>
+  <p class="bt">${escapeHtml(m.title)}</p>
+  <p class="bd">${escapeHtml(m.blurb || "")}</p>
+  <span class="badge">${escapeHtml(m.status || "")} · ${b.chapters.length} 章</span>
 </a>`;
     })
     .join("\n");
 
-  const home = `<header class="site">
-  <h1>${escapeHtml(site.title)}</h1>
-  ${site.subtitle ? `<p>${escapeHtml(site.subtitle)}</p>` : ""}
+  const home = `<header class="brand">
+  <div class="logo"><b>青</b>简 阅读</div>
+  ${site.subtitle ? `<div class="sub">${escapeHtml(site.subtitle)}</div>` : ""}
+  <div class="rule"></div>
 </header>
 <main class="shelf">
 ${cards || '<p style="grid-column:1/-1;text-align:center;color:var(--muted)">书架还空着，写几章就有了。</p>'}
@@ -352,21 +452,22 @@ ${footerHtml}`;
         const label = c.num
           ? `第${String(c.num).padStart(3, "0")}章 ${c.title.replace(/^第\s*\d+\s*章[\s\-—:：]*/, "")}`
           : c.title;
-        return `<li><a href="${chapHref(c.num)}"><span>${escapeHtml(label)}</span><span class="cn">${c.words} 字</span></a></li>`;
+        return `<li><a href="${chapHref(c.num)}"><span class="nm">${escapeHtml(label)}</span><span class="cn">${c.words} 字</span></a></li>`;
       })
       .join("\n");
 
-    const bookBody = `<div class="topbar"><div class="wrap"><a href="../../index.html">← 书架</a><span class="cn" style="color:var(--muted);font-size:.85rem">${b.chapters.length} 章 · 约 ${totalWords} 字</span></div></div>
+    const bookBody = `<header class="appbar"><a class="ic" href="../../index.html" aria-label="返回书架">‹</a><span class="t">${escapeHtml(m.title)}</span><span class="r">${b.chapters.length} 章 · 约 ${Math.round(totalWords / 1000)} 千字</span></header>
 <main class="wrap">
   <div class="bookhead">
     <img src="${escapeAttr(coverSrc)}" alt="${escapeAttr(m.title)} 封面">
     <div class="info">
       <h1>${escapeHtml(m.title)}</h1>
-      <p class="tags">${(m.tags || []).map((t) => `<span>${escapeHtml(t)}</span>`).join("")}</p>
-      <p class="blurb">${escapeHtml(m.blurb || "")}</p>
-      <p style="color:var(--muted);font-size:.85rem">作者：${escapeHtml(m.author || "佚名")} · ${escapeHtml(m.status || "")}</p>
+      <div class="by">${escapeHtml(m.author || "佚名")} 著 · ${escapeHtml(m.status || "")}</div>
+      <div class="tags">${(m.tags || []).map((t) => `<span>${escapeHtml(t)}</span>`).join("")}</div>
     </div>
   </div>
+  <p class="blurb">${escapeHtml(m.blurb || "")}</p>
+  <div class="toc-h">目录</div>
   <ul class="toc">
 ${tocItems || '<li style="padding:16px;color:var(--muted)">还没有章节</li>'}
   </ul>
@@ -385,21 +486,33 @@ ${footerHtml}`;
       const titleLabel = c.num
         ? `第${String(c.num).padStart(3, "0")}章 ${c.title.replace(/^第\s*\d+\s*章[\s\-—:：]*/, "")}`
         : c.title;
-      const nav = `<nav class="nav">
-  ${prev ? `<a href="${chapHref(prev.num)}">← 上一章</a>` : `<span>← 上一章</span>`}
-  <a href="index.html">目录</a>
-  ${next ? `<a href="${chapHref(next.num)}">下一章 →</a>` : `<span>下一章 →</span>`}
-</nav>`;
-      const body = `<div class="topbar"><div class="wrap"><a href="index.html">${escapeHtml(m.title)} · 目录</a><span class="tools"><button onclick="__fs('')">小</button><button onclick="__fs('fs-l')">中</button><button onclick="__fs('fs-xl')">大</button></span></div></div>
-<main class="wrap">
-  <article>
-    <h1 class="title">${escapeHtml(titleLabel)}</h1>
-    <p class="sub">${escapeHtml(m.title)} · ${c.words} 字</p>
+      const prevBtn = prev
+        ? `<a href="${chapHref(prev.num)}"><span class="ic">‹</span><span>上一章</span></a>`
+        : `<button class="dim"><span class="ic">‹</span><span>上一章</span></button>`;
+      const nextBtn = next
+        ? `<a href="${chapHref(next.num)}"><span class="ic">›</span><span>下一章</span></a>`
+        : `<button class="dim"><span class="ic">›</span><span>下一章</span></button>`;
+      const body = `<div class="reader" id="reader">
+  <header class="r-appbar">
+    <a class="ic" href="index.html" aria-label="返回目录">‹</a>
+    <span class="t">${escapeHtml(m.title)}</span>
+  </header>
+  <main class="page" id="page">
+    <article>
+      <h1 class="title">${escapeHtml(titleLabel)}</h1>
+      <p class="sub">${escapeHtml(m.title)} · ${c.words}字</p>
 ${c.html}
-  </article>
-  ${nav}
-</main>
-${footerHtml}
+      <p class="chap-end">— 本章完 —</p>
+    </article>
+  </main>
+  <nav class="r-botbar">
+    ${prevBtn}
+    <a href="index.html"><span class="ic">☰</span><span>目录</span></a>
+    <button onclick="__openSet()"><span class="ic">Aa</span><span>设置</span></button>
+    ${nextBtn}
+  </nav>
+  ${SETTINGS_SHEET}
+</div>
 ${READER_JS}`;
       await fs.writeFile(
         path.join(bookDir, chapHref(c.num)),
