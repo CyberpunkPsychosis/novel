@@ -356,6 +356,7 @@ async function loadBooks() {
   for (const dir of dirs) {
     const meta = await readJson(path.join(BOOKS_DIR, dir, "book.json"));
     if (!meta) continue;
+    if (meta.hidden) continue; // 在 book.json 里设 "hidden": true 可把该书从网站下架（稿件保留）
     const textDir = path.join(BOOKS_DIR, dir, "4-正文");
     let files = [];
     try {
