@@ -21,5 +21,6 @@
     "#1d2c3e"
   ],
   "coverAccent": "#d7484b",
-  "slug": "huisheng"
+  "slug": "huisheng",
+  "cover": "cover.png"
 }
