@@ -10,20 +10,20 @@ struct BookDetailView: View {
 
     var body: some View {
         ZStack {
-            Theme.bg.ignoresSafeArea()
+            ScreenBackground(opacity: 0.4)
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // 头部
                     HStack(alignment: .top, spacing: 16) {
                         CoverView(book: book).frame(width: 128)
                         VStack(alignment: .leading, spacing: 8) {
                             Text(book.title).font(Theme.serif(24, .bold)).foregroundStyle(Theme.ink)
-                            Text(book.author).font(.subheadline).foregroundStyle(Theme.inkSoft)
-                            if !book.status.isEmpty { TagChip(text: book.status, color: Theme.ochre) }
+                            Text(book.author).font(.subheadline).foregroundStyle(Theme.sub)
+                            RatingStars(value: MockData.rating(book.id))
+                            if !book.status.isEmpty { TagChip(text: book.status, color: Theme.bronze) }
                             if let parent {
                                 NavigationLink(value: parent.id) {
                                     Label("改编自《\(parent.title)》", systemImage: "arrow.uturn.backward")
-                                        .font(.caption).foregroundStyle(Theme.terracotta)
+                                        .font(.caption).foregroundStyle(Theme.terraDeep)
                                 }
                             }
                         }
@@ -38,39 +38,41 @@ struct BookDetailView: View {
 
                     Text(book.blurb).font(.body).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(4)
 
-                    // 核心操作
-                    Button { showFork = true } label: {
-                        Label("改编 / 续写这本书", systemImage: "arrow.triangle.branch")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.terracotta)
-                    .controlSize(.large)
+                    HStack(spacing: 12) {
+                        NavigationLink {
+                            ReaderView(book: book, startIndex: store.lastReadIndex(book.id) ?? (book.chapters.first?.index ?? 1))
+                        } label: {
+                            Label("开始阅读", systemImage: "book")
+                                .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+                        }
+                        .buttonStyle(.borderedProminent).tint(Theme.blue).controlSize(.large)
 
-                    // 支线
+                        Button { showFork = true } label: {
+                            Label("改编/续写", systemImage: "arrow.triangle.branch")
+                                .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)
+                        }
+                        .buttonStyle(.borderedProminent).tint(Theme.terraDeep).controlSize(.large)
+                    }
+
                     if !children.isEmpty {
                         SectionHeader(title: "由此开出的支线（\(children.count)）")
                         ForEach(children) { c in
                             NavigationLink(value: c.id) {
                                 HStack(spacing: 10) {
-                                    Image(systemName: "arrow.triangle.branch").foregroundStyle(Theme.terracotta)
+                                    Image(systemName: "arrow.triangle.branch").foregroundStyle(Theme.terraDeep)
                                     VStack(alignment: .leading) {
                                         Text(c.title).font(Theme.serif(15)).foregroundStyle(Theme.ink)
-                                        Text(c.author).font(.caption2).foregroundStyle(Theme.inkSoft)
+                                        Text(c.author).font(.caption2).foregroundStyle(Theme.sub)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Theme.line)
                                 }
                                 .padding(12)
                                 .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surface))
-                            }
-                            .buttonStyle(.plain)
+                            }.buttonStyle(.plain)
                         }
                     }
 
-                    // 目录
                     SectionHeader(title: "目录 · \(book.chapters.count) 章")
                     VStack(spacing: 0) {
                         ForEach(Array(book.chapters.enumerated()), id: \.element.id) { idx, ch in
@@ -84,9 +86,7 @@ struct BookDetailView: View {
                                 }
                                 .padding(.vertical, 12)
                             }
-                            if idx < book.chapters.count - 1 {
-                                Divider().background(Theme.line)
-                            }
+                            if idx < book.chapters.count - 1 { Divider().background(Theme.line) }
                         }
                     }
                     .padding(.horizontal, 14)
@@ -100,5 +100,6 @@ struct BookDetailView: View {
         .sheet(isPresented: $showFork) {
             ForkComposerView(parent: book).environmentObject(store)
         }
+        .bookDestination(store)
     }
 }

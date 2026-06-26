@@ -18,7 +18,7 @@ struct ForkComposerView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Theme.bg.ignoresSafeArea()
+                Theme.cream.ignoresSafeArea()
                 Form {
                     Section {
                         Picker("方式", selection: $mode) {
