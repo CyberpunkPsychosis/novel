@@ -11,9 +11,27 @@ struct LibraryView: View {
 
     var body: some View {
         ZStack {
+            // 真·首页背景：用作者拆出的植物线描素材（IMG_9479）
             Theme.bg.ignoresSafeArea()
+            Image("HomeBackground")
+                .resizable()
+                .scaledToFill()
+                .opacity(0.6)
+                .ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
+                    // 搜索栏
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(Theme.inkSoft)
+                        Text("搜书名、作者、标签…").foregroundStyle(Theme.inkSoft)
+                        Spacer()
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 14).padding(.vertical, 11)
+                    .background(Theme.surface.opacity(0.92))
+                    .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
+                    .clipShape(Capsule())
+
                     if let featured {
                         SectionHeader(title: "精选故事")
                         FeaturedCard(book: featured)
