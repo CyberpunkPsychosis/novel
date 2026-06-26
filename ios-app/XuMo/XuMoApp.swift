@@ -4,11 +4,14 @@ import SwiftUI
 struct XuMoApp: App {
     @StateObject private var store = LibraryStore()
 
+    init() { Theme.applyAppearance() }
+
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(store)
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(.light)
+                .tint(Theme.terracotta)
         }
     }
 }
@@ -17,11 +20,11 @@ struct RootView: View {
     var body: some View {
         TabView {
             NavigationStack { LibraryView() }
-                .tabItem { Label("发现", systemImage: "books.vertical") }
+                .tabItem { Label("书阁", systemImage: "books.vertical") }
 
             NavigationStack { MyCreationsView() }
                 .tabItem { Label("我的创作", systemImage: "pencil.and.outline") }
         }
-        .tint(Color(hex: "#d9a441"))
+        .tint(Theme.terracotta)
     }
 }
