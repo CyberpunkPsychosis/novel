@@ -3,16 +3,20 @@ import SwiftUI
 // MARK: 屏幕背景（作者提供的植物线描素材 IMG_9479）
 
 struct ScreenBackground: View {
-    var opacity: Double = 0.5
+    var opacity: Double = 0.4
     var body: some View {
-        ZStack {
-            Theme.cream
-            Image("HomeBackground")
-                .resizable()
-                .scaledToFill()
-                .opacity(opacity)
-        }
-        .ignoresSafeArea()
+        // 用 Color 承载尺寸（柔性，跟随屏幕），背景图作为 overlay 且裁剪，
+        // 避免横向大图把整屏宽度撑坏（之前排版错乱的根因）。
+        Theme.cream
+            .overlay {
+                Image("HomeBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .opacity(opacity)
+                    .clipped()
+                    .allowsHitTesting(false)
+            }
+            .ignoresSafeArea()
     }
 }
 
