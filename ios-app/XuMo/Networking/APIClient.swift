@@ -23,7 +23,21 @@ enum APIError: LocalizedError {
 struct APIClient {
     static let shared = APIClient()
     private let session: URLSession = .shared
-    private let decoder = JSONDecoder()
+    private let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        // 后端 DateTime 序列化为 ISO8601（带毫秒），自定义策略兼容有/无小数秒。
+        let withMs = ISO8601DateFormatter()
+        withMs.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        plain.formatOptions = [.withInternetDateTime]
+        d.dateDecodingStrategy = .custom { dec in
+            let s = try dec.singleValueContainer().decode(String.self)
+            if let dt = withMs.date(from: s) ?? plain.date(from: s) { return dt }
+            throw DecodingError.dataCorrupted(.init(codingPath: dec.codingPath,
+                                                    debugDescription: "无法解析日期: \(s)"))
+        }
+        return d
+    }()
 
     func request<T: Decodable>(_ path: String,
                                method: String = "GET",
@@ -81,3 +95,23 @@ struct NewBookPayload: Encodable {
         coverColors = b.coverColors; coverAccent = b.coverAccent; chapters = b.chapters
     }
 }
+
+// MARK: M2 fork 生态出入参
+struct ForkCreatePayload: Encodable {
+    let parentId: String
+    let mode: String          // "continuation" / "adaptation"
+    let fromChapter: Int
+    let newChapterTitle: String
+    let newContent: String
+}
+struct ForkRequestPayload: Encodable { let bookId: String; let fromChapter: Int; let mode: String }
+struct DecidePayload: Encodable { let approve: Bool }
+struct BuyPayload: Encodable { let amount: Int }
+
+struct CreditsResponse: Decodable {
+    let balance: Int
+    let txns: [CreditTxn]
+    let checkin: DailyCheckin
+}
+struct CheckinResponse: Decodable { let award: Int; let streak: Int }
+struct BalanceResponse: Decodable { let balance: Int }

@@ -38,6 +38,7 @@ struct RootContainer: View {
             guard store.isLoggedIn else { return }
             await store.refreshBooks()
             await store.loadRemoteProgress()
+            await store.syncPlatform()
         }
     }
 }

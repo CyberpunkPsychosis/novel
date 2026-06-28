@@ -125,6 +125,7 @@ struct BookDetailView: View {
             PermissionEditor(book: book).environmentObject(store)
         }
         .bookDestination(store)
+        .task { await store.loadPermission(book.id) }
     }
 
     private var branchRoot: Book { parent ?? book }
