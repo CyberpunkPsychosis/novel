@@ -1,7 +1,15 @@
-# XuMo 后端 · 里程碑 1
+# XuMo 后端
 
-账号（Sign in with Apple）+ 书/章节云端存取 + 阅读进度跨设备同步。
 Fastify + Prisma + PostgreSQL + JWT，Docker Compose 一键起。
+
+## 里程碑
+- **M1** 账号（Sign in with Apple / 开发期邮箱）+ 书/章节云端存取 + 阅读进度同步
+- **M2** fork 生态：改编/续写上云、作者授权、申请→审批、墨滴解锁与分成、通知
+- **M3** DeepSeek 内容审核、付费解锁真分成、评分与综合热度榜、StoreKit 入账（幂等）
+- **M4** 社区：书评 / 点赞 / 活动流 / 个人统计
+
+数据表：User / Book / Chapter / ReadingProgress / ForkPermission / ForkRequest /
+ForkUnlock / CreditTxn / DailyCheckin / Notification / Rating / Purchase（+ M4 新增）。
 
 ## 本地快速起（Docker）
 ```bash

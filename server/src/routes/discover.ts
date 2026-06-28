@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { serializeBook } from "../serialize.js";
-import { addCredits, balanceOf } from "../platform.js";
+import { addCredits, balanceOf, logActivity } from "../platform.js";
 
 // StoreKit 商品 → 墨滴 映射（与 iOS .storekit 配置一致）。
 const PRODUCTS: Record<string, number> = {
@@ -45,6 +45,7 @@ export async function discoverRoutes(app: FastifyInstance) {
         create: { userId: req.userId!, bookId: book.id, value },
         update: { value },
       });
+      await logActivity(req.userId!, "rate", `给《${book.title}》打了 ${value} 星`, book.id);
       const ratings = await prisma.rating.findMany({ where: { bookId: book.id } });
       const count = ratings.length;
       const avg = count ? ratings.reduce((s, r) => s + r.value, 0) / count : 0;

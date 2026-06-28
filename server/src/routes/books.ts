@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { serializeBook } from "../serialize.js";
-import { runModeration } from "../platform.js";
+import { logActivity, runModeration } from "../platform.js";
 
 export async function bookRoutes(app: FastifyInstance) {
   // GET /books -> [Book]（含 chapters + 评分聚合；本期 4 本全量返回，分页后期再说）
@@ -69,6 +69,7 @@ export async function bookRoutes(app: FastifyInstance) {
         },
         include: { chapters: true, ratings: true },
       });
+      await logActivity(me.id, "publish", `发布了新作《${book.title}》`, book.id);
       // 异步审核（不阻塞返回）：完成后写回状态并通知作者。
       runModeration(book.id).catch((e) => app.log.error(e));
       return serializeBook(book);

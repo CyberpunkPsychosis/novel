@@ -30,6 +30,22 @@ export async function notify(
   await prisma.notification.create({ data: { userId, type, actor, text } });
 }
 
+// 记一条活动流事件（发布/改编/评分/书评）。
+export async function logActivity(
+  userId: string, type: string, text: string, bookId: string | null = null
+) {
+  await prisma.activity.create({ data: { userId, type, text, bookId } });
+}
+
+// 相对时间文案。
+export function relativeTime(d: Date): string {
+  const sec = Math.max(0, (Date.now() - d.getTime()) / 1000);
+  if (sec < 60) return "刚刚";
+  if (sec < 3600) return `${Math.floor(sec / 60)} 分钟前`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)} 小时前`;
+  return `${Math.floor(sec / 86400)} 天前`;
+}
+
 // yyyy-MM-dd（UTC，避免时区漂移；签到颗粒度按天足够）。
 export function dayKey(d: Date): string {
   return d.toISOString().slice(0, 10);

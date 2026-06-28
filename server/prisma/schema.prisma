@@ -29,6 +29,9 @@ model User {
   forkUnlocks  ForkUnlock[]
   ratings      Rating[]
   purchases    Purchase[]
+  reviews      Review[]
+  reviewLikes  ReviewLike[]
+  activities   Activity[]
 }
 
 model Book {
@@ -55,6 +58,7 @@ model Book {
   forkRequests ForkRequest[]
   unlocks      ForkUnlock[]
   ratings      Rating[]
+  reviews      Review[]
 }
 
 model Chapter {
@@ -170,4 +174,41 @@ model Purchase {
   productId     String
   credits       Int
   createdAt     DateTime @default(now())
+}
+
+// MARK: 社区（里程碑4）
+
+// 书评。
+model Review {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId    String
+  book      Book         @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime     @default(now())
+  likes     ReviewLike[]
+}
+
+// 书评点赞（每用户每条一次）。
+model ReviewLike {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewId  String
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, reviewId])
+}
+
+// 活动流：发布/改编/评分/书评等事件。
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // publish / fork / rate / review
+  bookId    String?
+  text      String
+  createdAt DateTime @default(now())
 }

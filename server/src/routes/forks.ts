@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { serializeBook, serializeForkRequest, serializePermission } from "../serialize.js";
-import { addCredits, hasForkAccess, notify, runModeration, spendCredits } from "../platform.js";
+import { addCredits, hasForkAccess, logActivity, notify, runModeration, spendCredits } from "../platform.js";
 
 export async function forkRoutes(app: FastifyInstance) {
   // POST /forks  改编/续写真上云
@@ -72,6 +72,7 @@ export async function forkRoutes(app: FastifyInstance) {
       await notify(parent.ownerId, "newBranch",
         `${me.penName} 为《${parent.title}》开了新支线「${title}」`, me.penName);
     }
+    await logActivity(me.id, "fork", `${label}了《${parent.title}》，开出新支线`, child.id);
     // 异步审核新支线
     runModeration(child.id).catch((e) => app.log.error(e));
     return serializeBook(child);
