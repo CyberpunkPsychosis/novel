@@ -6,8 +6,9 @@ struct ProfileView: View {
 
     private var user: LocalUser { store.currentUser ?? LocalUser(id: "me", handle: "me", penName: "我") }
     private var stats: [(String, String)] {
-        [("\(store.readingProgress.count)", "在读"),
-         ("\(store.myCreations.count)", "我的创作"),
+        [("\(store.myCreations.count)", "创作"),
+         ("\(store.myStats.reviews)", "书评"),
+         ("\(store.myStats.likesReceived)", "获赞"),
          ("\(store.molDi)", "墨滴")]
     }
 
@@ -48,6 +49,8 @@ struct ProfileView: View {
                     VStack(spacing: 9) {
                         NavigationLink { MyCreationsList() } label: { MenuRow(title: "我的创作", icon: "books.vertical") }
                             .buttonStyle(.plain)
+                        NavigationLink { MyReviewsList() } label: { MenuRow(title: "我的书评", icon: "text.bubble") }
+                            .buttonStyle(.plain)
                         NavigationLink { ForkRequestsInboxView() } label: {
                             MenuRow(title: "改编申请", icon: "arrow.triangle.branch",
                                     badge: store.incomingForkRequests.filter { $0.status == .pending }.count)
@@ -63,6 +66,43 @@ struct ProfileView: View {
         }
         .navigationTitle("我的")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await store.loadMyStats() }
+    }
+}
+
+/// 「我的书评」列表
+struct MyReviewsList: View {
+    @EnvironmentObject var store: LibraryStore
+    @State private var reviews: [BookReview] = []
+    var body: some View {
+        ZStack {
+            ScreenBackground(opacity: 0.5)
+            ScrollView {
+                VStack(spacing: 12) {
+                    if reviews.isEmpty {
+                        Text("还没有书评。").font(.subheadline).foregroundStyle(Theme.sub).padding(.top, 40)
+                    } else {
+                        ForEach(reviews) { r in
+                            NavigationLink(value: r.bookID) {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(store.book(id: r.bookID)?.title ?? "某书")
+                                        .font(Theme.serif(15, .semibold)).foregroundStyle(Theme.ink)
+                                    Text(r.text).font(.subheadline).foregroundStyle(Theme.ink.opacity(0.85))
+                                    Text("♥ \(r.likeCount)").font(.caption2).foregroundStyle(Theme.terracotta)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surface))
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }.padding(20)
+            }
+        }
+        .navigationTitle("我的书评")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { reviews = await store.myReviews() }
+        .bookDestination(store)
     }
 }
 

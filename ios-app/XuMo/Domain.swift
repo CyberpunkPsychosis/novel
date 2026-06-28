@@ -150,6 +150,36 @@ struct BranchGraph {
     var startNodes: [BranchNode] { nodes.filter { n in !edges.contains { $0.to == n.id } } }
 }
 
+// MARK: 社区（里程碑4）
+struct BookReview: Codable, Identifiable, Hashable {
+    var id: String
+    var author: String
+    var avatarColorHex: String
+    var bookID: String
+    var text: String
+    var date: Date
+    var likeCount: Int
+    var likedByMe: Bool
+}
+
+/// /feed 返回项（映射成 CommunityEvent 展示）。
+struct FeedItem: Codable, Identifiable, Hashable {
+    var id: String
+    var who: String
+    var avatarColorHex: String
+    var text: String
+    var meta: String
+    var bookId: String?
+}
+
+struct CommunityStats: Codable, Hashable {
+    var creations: Int = 0
+    var reviews: Int = 0
+    var likesReceived: Int = 0
+}
+
+struct LikeResult: Codable { var liked: Bool; var likeCount: Int }
+
 // MARK: 日期工具
 enum DayKey {
     static let fmt: DateFormatter = {

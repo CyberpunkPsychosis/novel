@@ -22,6 +22,10 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var myRatings: [String: Int] = [:]
     /// 综合热度榜（GET /rankings）
     @Published private(set) var rankedBooks: [Book] = []
+    /// 全站活动流（GET /feed）
+    @Published private(set) var feed: [CommunityEvent] = []
+    /// 我的社区统计（GET /me/stats）
+    @Published private(set) var myStats = CommunityStats()
 
     /// 服务器下发的书（含种子+他人已发布+我已同步的）；离线时来自缓存，再退到 bundle seed。
     private var serverBooks: [Book] = []
@@ -498,6 +502,43 @@ extension LibraryStore {
         await loadCredits()
     }
 
+    // MARK: 社区（活动流 / 书评 / 统计）
+    @MainActor
+    func loadFeed() async {
+        guard let items: [FeedItem] = try? await APIClient.shared.request("/feed") else { return }
+        feed = items.map { CommunityEvent(who: $0.who, avatarColorHex: $0.avatarColorHex,
+                                          text: $0.text, meta: $0.meta) }
+    }
+
+    @MainActor
+    func loadMyStats() async {
+        if let s: CommunityStats = try? await APIClient.shared.request("/me/stats", auth: true) {
+            myStats = s
+        }
+    }
+
+    /// 拉某本书的书评（登录则带 token 以得到 likedByMe）。
+    func reviews(of bookID: String) async -> [BookReview] {
+        (try? await APIClient.shared.request("/books/\(bookID)/reviews", auth: isLoggedIn)) ?? []
+    }
+
+    @discardableResult
+    func postReview(bookID: String, text: String) async -> Bool {
+        let body = try? JSONEncoder().encode(["text": text])
+        let ok = (try? await APIClient.shared.request("/books/\(bookID)/reviews", method: "POST",
+                                                      bodyData: body, auth: true) as BookReview) != nil
+        if ok { await loadFeed(); await loadMyStats() }
+        return ok
+    }
+
+    func likeReview(_ reviewID: String) async -> LikeResult? {
+        try? await APIClient.shared.request("/reviews/\(reviewID)/like", method: "POST", auth: true)
+    }
+
+    func myReviews() async -> [BookReview] {
+        (try? await APIClient.shared.request("/me/reviews", auth: true)) ?? []
+    }
+
     // MARK: 平台数据同步（登录/启动把服务器真数据拉进 @Published 缓存）
     @MainActor
     func syncPlatform() async {
@@ -508,6 +549,8 @@ extension LibraryStore {
         await loadUnlocks()
         await loadMyRatings()
         await loadRankings()
+        await loadFeed()
+        await loadMyStats()
     }
 
     @MainActor

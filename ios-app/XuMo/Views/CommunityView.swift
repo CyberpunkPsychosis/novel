@@ -6,16 +6,8 @@ struct CommunityView: View {
     @State private var showCompose = false
     @State private var postedTopics: [HotTopic] = []
 
-    /// 真实改编/续写事件拼到动态流最前
-    private var forkEvents: [CommunityEvent] {
-        store.myCreations.reversed().map { b in
-            let label = b.tagline.contains("续写") ? "续写" : "改编"
-            return CommunityEvent(who: b.author, avatarColorHex: "#A65A3C",
-                                  text: "\(label)了《\(parentTitle(b))》，开出新支线", meta: "刚刚 · ⤴ \(label)")
-        }
-    }
-    private func parentTitle(_ b: Book) -> String { b.forkOf.flatMap { store.book(id: $0)?.title } ?? "" }
-    private var feed: [CommunityEvent] { forkEvents + MockData.baseFeed }
+    /// 全站活动流（服务器真数据）；未拉到时退回演示数据。
+    private var feed: [CommunityEvent] { store.feed.isEmpty ? MockData.baseFeed : store.feed }
 
     var body: some View {
         ZStack {
@@ -56,6 +48,8 @@ struct CommunityView: View {
         }
         .navigationTitle("社区")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await store.loadFeed() }
+        .refreshable { await store.loadFeed() }
         .sheet(isPresented: $showCompose) {
             CommunityComposeSheet { title in
                 postedTopics.insert(HotTopic(title: title.hasPrefix("#") ? title : "#\(title)",

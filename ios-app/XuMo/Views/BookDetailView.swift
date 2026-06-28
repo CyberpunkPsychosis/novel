@@ -95,6 +95,8 @@ struct BookDetailView: View {
                         }
                     }
 
+                    ReviewsSection(book: book)
+
                     SectionHeader(title: "目录 · \(book.chapters.count) 章")
                     VStack(spacing: 0) {
                         ForEach(Array(book.chapters.enumerated()), id: \.element.id) { idx, ch in
@@ -204,6 +206,115 @@ struct RatingRow: View {
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
+    }
+}
+
+/// 书评区：列表 + 写书评 + 点赞。
+struct ReviewsSection: View {
+    @EnvironmentObject var store: LibraryStore
+    let book: Book
+    @State private var reviews: [BookReview] = []
+    @State private var composing = false
+    @State private var draft = ""
+    @State private var posting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                SectionHeader(title: "书评（\(reviews.count)）")
+                Spacer()
+                Button { composing = true } label: {
+                    Label("写书评", systemImage: "square.and.pencil")
+                        .font(.caption.weight(.semibold)).foregroundStyle(Theme.terraDeep)
+                }
+            }
+            if reviews.isEmpty {
+                Text("还没有书评，来写第一条。").font(.subheadline).foregroundStyle(Theme.sub)
+            } else {
+                ForEach(reviews) { r in ReviewRow(review: r) { await toggleLike(r) } }
+            }
+        }
+        .task { await reload() }
+        .sheet(isPresented: $composing) {
+            ReviewComposeSheet(draft: $draft, posting: $posting) { await submit() }
+        }
+    }
+
+    private func reload() async { reviews = await store.reviews(of: book.id) }
+
+    private func submit() async {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        posting = true
+        let ok = await store.postReview(bookID: book.id, text: text)
+        posting = false
+        if ok { draft = ""; composing = false; await reload() }
+    }
+
+    private func toggleLike(_ r: BookReview) async {
+        guard let res = await store.likeReview(r.id) else { return }
+        if let i = reviews.firstIndex(where: { $0.id == r.id }) {
+            reviews[i].likedByMe = res.liked
+            reviews[i].likeCount = res.likeCount
+        }
+    }
+}
+
+struct ReviewRow: View {
+    let review: BookReview
+    let onLike: () async -> Void
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Circle().fill(Color(hex: review.avatarColorHex)).frame(width: 32, height: 32)
+                .overlay(Text(String(review.author.prefix(1))).font(.caption).foregroundStyle(.white))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(review.author).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                Text(review.text).font(.subheadline).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(3)
+            }
+            Spacer(minLength: 6)
+            Button { Task { await onLike() } } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: review.likedByMe ? "heart.fill" : "heart")
+                    Text("\(review.likeCount)").font(.caption2)
+                }
+                .foregroundStyle(review.likedByMe ? Theme.terracotta : Theme.sub)
+            }.buttonStyle(.plain)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surface))
+    }
+}
+
+struct ReviewComposeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var draft: String
+    @Binding var posting: Bool
+    let onSubmit: () async -> Void
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.cream.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("写书评").font(Theme.serif(18, .semibold)).foregroundStyle(Theme.ink)
+                    TextField("说说你的感受…", text: $draft, axis: .vertical)
+                        .lineLimit(4...10).padding(12)
+                        .background(Theme.surface)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Spacer()
+                }.padding(20)
+            }
+            .navigationTitle("写书评")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("发布") { Task { await onSubmit() } }
+                        .disabled(posting || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
     }
 }
 
