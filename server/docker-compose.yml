@@ -1,0 +1,39 @@
+# 一键起 postgres + api。
+#   docker compose up -d
+#   docker compose exec api npx prisma migrate deploy
+#   docker compose exec api npm run db:seed
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xumo
+      POSTGRES_PASSWORD: xumo
+      POSTGRES_DB: xumo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xumo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://xumo:xumo@db:5432/xumo?schema=public"
+      JWT_SECRET: "${JWT_SECRET:-dev-only-change-me-please}"
+      APPLE_BUNDLE_ID: "${APPLE_BUNDLE_ID:-com.example.xumo}"
+      DEV_EMAIL_LOGIN: "${DEV_EMAIL_LOGIN:-true}"
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

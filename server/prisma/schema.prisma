@@ -1,0 +1,66 @@
+// XuMo 里程碑1 数据模型。字段刻意与 iOS Book/Chapter/LocalUser 对齐，
+// JSON 序列化即 Swift Codable。fork / 墨滴留好外键命名，里程碑2 再补表。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  appleSub       String?  @unique // Apple Sign in 的 sub；开发期邮箱通道为空
+  email          String?  @unique // 开发期临时邮箱登录用
+  handle         String   @unique
+  penName        String
+  bio            String   @default("慢慢长大的书架")
+  avatarColorHex String   @default("#A65A3C")
+  createdAt      DateTime @default(now())
+
+  books    Book[]            @relation("OwnedBooks")
+  progress ReadingProgress[]
+}
+
+model Book {
+  id              String   @id @default(cuid())
+  title           String
+  author          String
+  blurb           String
+  tags            String[]
+  tagline         String
+  coverColors     String[]
+  coverAccent     String
+  status          String
+  forkOf          String? // 父书 id（里程碑2 才真正产生 fork）
+  forkFromChapter Int?
+  isUserCreated   Boolean  @default(false)
+  ownerId         String?
+  owner           User?    @relation("OwnedBooks", fields: [ownerId], references: [id])
+  createdAt       DateTime @default(now())
+
+  chapters Chapter[]
+}
+
+model Chapter {
+  id      String @id @default(cuid())
+  bookId  String
+  book    Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  index   Int
+  title   String
+  content String
+
+  @@unique([bookId, index])
+}
+
+model ReadingProgress {
+  id           String @id @default(cuid())
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId       String
+  chapterIndex Int
+
+  @@unique([userId, bookId])
+}
