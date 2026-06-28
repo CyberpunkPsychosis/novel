@@ -7,7 +7,7 @@ struct ShelfView: View {
     private let grid = [GridItem(.adaptive(minimum: 100), spacing: 16)]
     private var reading: [Book] { store.inProgressBooks }
     private var mine: [Book] { store.myCreations }
-    private var favorites: [Book] { store.books.filter { !$0.isUserCreated } }
+    private var favorites: [Book] { store.favoriteBooks }
 
     var body: some View {
         ZStack {
@@ -29,7 +29,7 @@ struct ShelfView: View {
                         SectionHeader(title: "我的创作")
                         Spacer()
                         Button { showNewWork = true } label: {
-                            Label("上传新作", systemImage: "square.and.arrow.up")
+                            Label("上传新作", systemImage: "plus")
                                 .font(.caption.weight(.semibold)).foregroundStyle(Color(hex: "#F4ECDF"))
                                 .padding(.horizontal, 12).padding(.vertical, 6)
                                 .background(Theme.terraDeep).clipShape(Capsule())
@@ -48,14 +48,23 @@ struct ShelfView: View {
                     }
 
                     SectionHeader(title: "收藏")
-                    LazyVGrid(columns: grid, spacing: 18) {
-                        ForEach(favorites) { b in
-                            NavigationLink(value: b.id) { CoverView(book: b) }.buttonStyle(.plain)
+                    if favorites.isEmpty {
+                        Text("还没有收藏。进任意一本书，点右上角 ♡ 即可加入收藏。")
+                            .font(.footnote).foregroundStyle(Theme.sub)
+                            .padding(14)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
+                    } else {
+                        LazyVGrid(columns: grid, spacing: 18) {
+                            ForEach(favorites) { b in
+                                NavigationLink(value: b.id) { CoverView(book: b) }.buttonStyle(.plain)
+                            }
                         }
                     }
                 }
                 .padding(20)
             }
+            .refreshable { await store.refreshBooks(); await store.loadFavorites() }
         }
         .navigationTitle("书架")
         .navigationBarTitleDisplayMode(.inline)

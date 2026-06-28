@@ -180,6 +180,42 @@ struct CommunityStats: Codable, Hashable {
 
 struct LikeResult: Codable { var liked: Bool; var likeCount: Int }
 
+// 话题
+struct TopicItem: Codable, Identifiable, Hashable {
+    var id: String
+    var title: String
+    var author: String
+    var avatarColorHex: String
+    var replyCount: Int
+    var meta: String
+}
+struct TopicReplyItem: Codable, Identifiable, Hashable {
+    var id: String
+    var author: String
+    var avatarColorHex: String
+    var text: String
+    var date: Date
+}
+struct TopicDetail: Codable, Hashable {
+    var id: String
+    var title: String
+    var body: String
+    var author: String
+    var avatarColorHex: String
+    var date: Date
+    var replies: [TopicReplyItem]
+}
+
+// 俱乐部
+struct ClubItem: Codable, Identifiable, Hashable {
+    var id: String
+    var name: String
+    var intro: String
+    var memberCount: Int
+    var joinedByMe: Bool
+}
+struct JoinResult: Codable { var joined: Bool; var memberCount: Int }
+
 // MARK: 日期工具
 enum DayKey {
     static let fmt: DateFormatter = {

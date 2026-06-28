@@ -1,49 +1,68 @@
 import Foundation
 import Security
 
-/// JWT 存 Keychain（比 UserDefaults 安全；删 App 才清）。
+/// JWT 存储：内存缓存（当次会话必可用）+ Keychain（首选持久化）+ UserDefaults 兜底。
+/// 未签名的模拟器 build 上 Keychain 可能写入失败，故加 UserDefaults 兜底，保证登录态稳。
 enum TokenStore {
     private static let service = "app.xumo.jwt"
     private static let account = "current"
+    private static let udKey = "XUMO_JWT"
+
+    private static var cached: String?
 
     static var token: String? {
-        get { read() }
+        get {
+            if let c = cached { return c }
+            if let k = keychainRead() { cached = k; return k }
+            if let u = UserDefaults.standard.string(forKey: udKey) { cached = u; return u }
+            return nil
+        }
         set {
-            if let v = newValue, !v.isEmpty { write(v) } else { clear() }
+            cached = newValue
+            if let v = newValue, !v.isEmpty {
+                keychainWrite(v)
+                UserDefaults.standard.set(v, forKey: udKey)
+            } else {
+                clear()
+            }
         }
     }
 
-    private static func write(_ value: String) {
-        clear()
-        let q: [String: Any] = [
+    static func clear() {
+        cached = nil
+        UserDefaults.standard.removeObject(forKey: udKey)
+        SecItemDelete([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ] as CFDictionary)
+    }
+
+    // MARK: Keychain（best-effort）
+    private static func keychainWrite(_ value: String) {
+        SecItemDelete([
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ] as CFDictionary)
+        SecItemAdd([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecValueData as String: Data(value.utf8),
-        ]
-        SecItemAdd(q as CFDictionary, nil)
+        ] as CFDictionary, nil)
     }
 
-    private static func read() -> String? {
-        let q: [String: Any] = [
+    private static func keychainRead() -> String? {
+        var out: AnyObject?
+        let status = SecItemCopyMatching([
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var out: AnyObject?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess,
-              let d = out as? Data else { return nil }
+        ] as CFDictionary, &out)
+        guard status == errSecSuccess, let d = out as? Data else { return nil }
         return String(data: d, encoding: .utf8)
-    }
-
-    static func clear() {
-        let q: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-        ]
-        SecItemDelete(q as CFDictionary)
     }
 }

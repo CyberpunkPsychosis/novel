@@ -5,7 +5,7 @@ import AuthenticationServices
 struct AuthView: View {
     @EnvironmentObject var store: LibraryStore
     @State private var penName = ""
-    @State private var showDev = false
+    @State private var showDev = true   // 测试期默认展开邮箱登录（Apple 登录需付费开发者账号）
     @State private var devEmail = ""
     @State private var busy = false
     @State private var errorText: String?

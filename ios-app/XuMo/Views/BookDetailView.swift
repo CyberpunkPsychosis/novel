@@ -12,8 +12,8 @@ struct BookDetailView: View {
     private var isOwner: Bool { store.isOwner(book) }
     private var perm: ForkPermission { store.permission(for: book.id) }
     private var moderation: ModerationStatus { store.moderationStatus(for: book.id) }
-    /// 这本书是否有可视化的分支（真实 fork 或 demo）。
-    private var hasBranches: Bool { !children.isEmpty || book.id == "huisheng" }
+    /// 这本书是否有可视化的分支（有真实 fork 子书才显示）。
+    private var hasBranches: Bool { !children.isEmpty }
 
     var body: some View {
         ZStack {
@@ -122,6 +122,17 @@ struct BookDetailView: View {
         .overlay { if let toast { ToastView(text: toast).onAppear { clearToast() } } }
         .navigationTitle(book.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    store.toggleFavorite(book.id)
+                    toast = store.isFavorite(book.id) ? "已加入收藏" : "已取消收藏"
+                } label: {
+                    Image(systemName: store.isFavorite(book.id) ? "heart.fill" : "heart")
+                        .foregroundStyle(store.isFavorite(book.id) ? Theme.terracotta : Theme.sub)
+                }
+            }
+        }
         .sheet(isPresented: $showFork) {
             ForkComposerView(parent: book).environmentObject(store)
         }
@@ -161,8 +172,10 @@ struct BookDetailView: View {
         } else {
             // 需要作者审批
             Button {
-                store.requestFork(book: book, fromChapter: book.chapters.last?.index ?? 1, mode: "续写")
-                toast = "已发出申请，等作者同意"
+                Task { @MainActor in
+                    let ok = await store.requestFork(book: book, fromChapter: book.chapters.last?.index ?? 1, mode: "续写")
+                    toast = ok ? "已发出申请，等作者同意" : "申请失败，请退出登录后重新登录再试"
+                }
             } label: {
                 Label("申请改编/续写", systemImage: "paperplane")
                     .font(.headline).frame(maxWidth: .infinity).padding(.vertical, 6)

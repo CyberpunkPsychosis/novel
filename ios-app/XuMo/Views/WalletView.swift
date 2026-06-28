@@ -66,7 +66,10 @@ struct WalletView: View {
         }
         .navigationTitle("墨滴钱包")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showBuy) { BuyMolDiSheet().environmentObject(store) }
+        .task { await store.loadCredits() }
+        .sheet(isPresented: $showBuy, onDismiss: { Task { await store.loadCredits() } }) {
+            BuyMolDiSheet().environmentObject(store)
+        }
     }
 
     private func dismissToast() {

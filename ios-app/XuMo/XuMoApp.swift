@@ -36,6 +36,8 @@ struct RootContainer: View {
         // 已登录（含重装后 Keychain 仍在）时，冷启动拉一次云端书库与进度。
         .task(id: store.isLoggedIn) {
             guard store.isLoggedIn else { return }
+            await store.verifySession()          // token 失效则自动登出
+            guard store.isLoggedIn else { return }
             await store.refreshBooks()
             await store.loadRemoteProgress()
             await store.syncPlatform()

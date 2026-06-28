@@ -26,6 +26,12 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var feed: [CommunityEvent] = []
     /// 我的社区统计（GET /me/stats）
     @Published private(set) var myStats = CommunityStats()
+    /// 我收藏的书 id
+    @Published private(set) var favorites: Set<String> = []
+    /// 社区话题
+    @Published private(set) var topics: [TopicItem] = []
+    /// 书友俱乐部
+    @Published private(set) var clubs: [ClubItem] = []
 
     /// 服务器下发的书（含种子+他人已发布+我已同步的）；离线时来自缓存，再退到 bundle seed。
     private var serverBooks: [Book] = []
@@ -271,6 +277,21 @@ extension LibraryStore {
         try? FileManager.default.removeItem(at: userURL)
     }
 
+    /// 启动时校验登录态：token 失效（如账号已删/过期）就自动登出，避免卡在死账号。
+    @MainActor
+    func verifySession() async {
+        guard isLoggedIn else { return }
+        do {
+            let me: LocalUser = try await APIClient.shared.request("/me", auth: true)
+            currentUser = me
+            save(currentUser, to: userURL)
+        } catch APIError.unauthorized {
+            logout()
+        } catch {
+            // 离线等其它错误：保留本地会话。
+        }
+    }
+
     // MARK: 真实登录（接后端 · 里程碑1）
     @MainActor
     func signInWithApple(identityToken: String, penName: String?) async throws {
@@ -364,7 +385,9 @@ extension LibraryStore {
         let award = 10 + min(checkin.streak, 7) * 2
         addCredits(award, reason: .checkin, note: "连续签到 \(checkin.streak) 天")   // 乐观
         Task {
-            _ = try? await APIClient.shared.request("/me/checkin", method: "POST", auth: true) as CheckinResponse
+            // 把客户端本地日期发给服务器，按用户的"今天"记，避免 UTC 错位。
+            let body = try? JSONEncoder().encode(["day": today])
+            _ = try? await APIClient.shared.request("/me/checkin", method: "POST", bodyData: body, auth: true) as CheckinResponse
             await loadCredits()
             await loadNotifications()
         }
@@ -426,11 +449,11 @@ extension LibraryStore {
         return true
     }
 
-    func requestFork(book: Book, fromChapter: Int, mode: String) {
-        Task {
-            let body = try? JSONEncoder().encode(ForkRequestPayload(bookId: book.id, fromChapter: fromChapter, mode: mode))
-            _ = try? await APIClient.shared.request("/fork-requests", method: "POST", bodyData: body, auth: true) as ForkRequest
-        }
+    @discardableResult
+    func requestFork(book: Book, fromChapter: Int, mode: String) async -> Bool {
+        let body = try? JSONEncoder().encode(ForkRequestPayload(bookId: book.id, fromChapter: fromChapter, mode: mode))
+        return (try? await APIClient.shared.request("/fork-requests", method: "POST",
+                                                    bodyData: body, auth: true) as ForkRequest) != nil
     }
 
     /// 我作为作者收到的改编/续写申请（已由服务器筛为「针对我创作的书」）。
@@ -539,6 +562,77 @@ extension LibraryStore {
         (try? await APIClient.shared.request("/me/reviews", auth: true)) ?? []
     }
 
+    // MARK: 收藏
+    func isFavorite(_ bookID: String) -> Bool { favorites.contains(bookID) }
+    var favoriteBooks: [Book] { books.filter { favorites.contains($0.id) } }
+
+    @MainActor
+    func loadFavorites() async {
+        if let ids: [String] = try? await APIClient.shared.request("/me/favorites", auth: true) {
+            favorites = Set(ids)
+        }
+    }
+
+    func toggleFavorite(_ bookID: String) {
+        if favorites.contains(bookID) { favorites.remove(bookID) } else { favorites.insert(bookID) }  // 乐观
+        Task {
+            struct Fav: Decodable { let favorited: Bool }
+            if let r = try? await APIClient.shared.request("/books/\(bookID)/favorite", method: "POST", auth: true) as Fav {
+                await MainActor.run { if r.favorited { favorites.insert(bookID) } else { favorites.remove(bookID) } }
+            } else {
+                await loadFavorites()   // 失败回滚为真状态
+            }
+        }
+    }
+
+    // MARK: 话题
+    @MainActor
+    func loadTopics() async {
+        if let t: [TopicItem] = try? await APIClient.shared.request("/topics") { topics = t }
+    }
+
+    @discardableResult
+    func postTopic(title: String, body: String) async -> Bool {
+        let payload = try? JSONEncoder().encode(["title": title, "body": body])
+        let ok = (try? await APIClient.shared.request("/topics", method: "POST", bodyData: payload, auth: true) as TopicItem) != nil
+        if ok { await loadTopics() }
+        return ok
+    }
+
+    func topicDetail(_ id: String) async -> TopicDetail? {
+        try? await APIClient.shared.request("/topics/\(id)")
+    }
+
+    func postReply(topicID: String, text: String) async -> TopicReplyItem? {
+        let payload = try? JSONEncoder().encode(["text": text])
+        let r: TopicReplyItem? = try? await APIClient.shared.request("/topics/\(topicID)/replies", method: "POST", bodyData: payload, auth: true)
+        if r != nil { await loadTopics() }   // 回帖数变了，刷新列表
+        return r
+    }
+
+    // MARK: 俱乐部
+    @MainActor
+    func loadClubs() async {
+        if let c: [ClubItem] = try? await APIClient.shared.request("/clubs", auth: isLoggedIn) { clubs = c }
+    }
+
+    func toggleClub(_ clubID: String) {
+        // 乐观切换
+        if let i = clubs.firstIndex(where: { $0.id == clubID }) {
+            clubs[i].joinedByMe.toggle()
+            clubs[i].memberCount += clubs[i].joinedByMe ? 1 : -1
+        }
+        Task {
+            if let r = try? await APIClient.shared.request("/clubs/\(clubID)/join", method: "POST", auth: true) as JoinResult {
+                await MainActor.run {
+                    if let i = clubs.firstIndex(where: { $0.id == clubID }) {
+                        clubs[i].joinedByMe = r.joined; clubs[i].memberCount = r.memberCount
+                    }
+                }
+            } else { await loadClubs() }
+        }
+    }
+
     // MARK: 平台数据同步（登录/启动把服务器真数据拉进 @Published 缓存）
     @MainActor
     func syncPlatform() async {
@@ -551,6 +645,9 @@ extension LibraryStore {
         await loadRankings()
         await loadFeed()
         await loadMyStats()
+        await loadFavorites()
+        await loadTopics()
+        await loadClubs()
     }
 
     @MainActor
@@ -579,9 +676,9 @@ extension LibraryStore {
         save(Array(unlockedBooks), to: unlocksURL)
     }
 
-    // MARK: 分支图
+    // MARK: 分支图（完全由真实 fork 关系生成）
     func branchGraph(for root: Book) -> BranchGraph {
-        root.id == "huisheng" ? demoHuishengGraph() : spineWithChildren(root)
+        spineWithChildren(root)
     }
 
     private func nodeID(_ bookID: String, _ idx: Int) -> String { "\(bookID)#\(idx)" }
@@ -624,45 +721,6 @@ extension LibraryStore {
                 }
             }
         }
-        return BranchGraph(nodes: nodes, edges: edges)
-    }
-
-    /// 手写的《回声邮局》三向分叉 + 合流，演示流程图与分支阅读。
-    private func demoHuishengGraph() -> BranchGraph {
-        let A = LocalUser.seedAuthorName    // 观山海（原作）
-        func real(_ i: Int) -> BranchNode {
-            let t = book(id: "huisheng")?.chapters.first { $0.index == i }?.title ?? "第\(i)章"
-            return BranchNode(id: nodeID("huisheng", i), bookID: "huisheng", chapterIndex: i, title: t, authorName: A)
-        }
-        func synth(_ id: String, _ title: String, _ author: String, _ body: String, end: Bool = false) -> BranchNode {
-            BranchNode(id: id, bookID: "huisheng-demo", chapterIndex: -1, title: title,
-                       authorName: author, isEnding: end, content: body)
-        }
-        let nodes: [BranchNode] = [
-            real(1), real(2), real(3), real(4),
-            BranchNode(id: nodeID("huisheng", 5), bookID: "huisheng", chapterIndex: 5,
-                       title: book(id: "huisheng")?.chapters.first { $0.index == 5 }?.title ?? "第5章",
-                       authorName: A, isEnding: true),
-            synth("burn-1", "烧掉那封信", "阿澄", "她终究没有寄出去。火舌舔过信纸的一角，字迹蜷缩、发黑，像从未存在过。"),
-            synth("burn-2", "灰烬里的回声", "阿澄", "多年以后她仍能背出每一个字。有些话烧掉了，反而再也忘不掉。", end: true),
-            synth("deliver-1", "亲手送去", "南风", "她把信揣进怀里，坐了三个小时的车。门开的那一刻，所有预想的台词都哑了。"),
-        ]
-        let edges: [BranchEdge] = [
-            BranchEdge(from: nodeID("huisheng", 1), to: nodeID("huisheng", 2), type: .linear),
-            BranchEdge(from: nodeID("huisheng", 2), to: nodeID("huisheng", 3), type: .linear),
-            // 第3章是分叉点：三个选择
-            BranchEdge(from: nodeID("huisheng", 3), to: nodeID("huisheng", 4), type: .branch,
-                       label: "寄出那封信", branchAuthor: A),
-            BranchEdge(from: nodeID("huisheng", 3), to: "burn-1", type: .branch,
-                       label: "烧掉那封信", branchAuthor: "阿澄"),
-            BranchEdge(from: nodeID("huisheng", 3), to: "deliver-1", type: .branch,
-                       label: "亲手送去", branchAuthor: "南风"),
-            // 烧信线走向独立结局
-            BranchEdge(from: "burn-1", to: "burn-2", type: .linear),
-            // 寄信线 与 亲手送去线 都合流回主线第5章
-            BranchEdge(from: nodeID("huisheng", 4), to: nodeID("huisheng", 5), type: .linear),
-            BranchEdge(from: "deliver-1", to: nodeID("huisheng", 5), type: .merge),
-        ]
         return BranchGraph(nodes: nodes, edges: edges)
     }
 }
