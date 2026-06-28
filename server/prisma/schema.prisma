@@ -32,6 +32,10 @@ model User {
   reviews      Review[]
   reviewLikes  ReviewLike[]
   activities   Activity[]
+  favorites    Favorite[]
+  topics       Topic[]
+  topicReplies TopicReply[]
+  clubMembers  ClubMember[]
 }
 
 model Book {
@@ -59,6 +63,7 @@ model Book {
   unlocks      ForkUnlock[]
   ratings      Rating[]
   reviews      Review[]
+  favorites    Favorite[]
 }
 
 model Chapter {
@@ -211,4 +216,57 @@ model Activity {
   bookId    String?
   text      String
   createdAt DateTime @default(now())
+}
+
+// 收藏 / 加入书架。
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bookId])
+}
+
+// 社区话题（讨论帖）。
+model Topic {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String       @default("")
+  createdAt DateTime     @default(now())
+  replies   TopicReply[]
+}
+
+model TopicReply {
+  id        String   @id @default(cuid())
+  topicId   String
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+}
+
+// 书友俱乐部。
+model Club {
+  id        String       @id @default(cuid())
+  name      String
+  intro     String       @default("")
+  createdAt DateTime     @default(now())
+  members   ClubMember[]
+}
+
+model ClubMember {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clubId    String
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, clubId])
 }

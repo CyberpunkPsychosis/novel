@@ -106,6 +106,16 @@ async function main() {
     console.log("  ✓ 《法眼》授权：30 墨滴免审批解锁");
   }
 
+  // 演示：两个书友俱乐部（成员数由真实加入产生）
+  for (const c of [
+    { name: "言情研究所", intro: "专攻都市/古言/虐恋的同好" },
+    { name: "悬疑推理社", intro: "一起拆解伏笔与反转" },
+  ]) {
+    const exists = await prisma.club.findFirst({ where: { name: c.name } });
+    if (!exists) await prisma.club.create({ data: c });
+  }
+  console.log("  ✓ 俱乐部：言情研究所 / 悬疑推理社");
+
   const total = await prisma.chapter.count();
   console.log(`完成：${books.length} 本书，共 ${total} 章。`);
 }

@@ -14,13 +14,15 @@ export async function creditRoutes(app: FastifyInstance) {
     return { balance, txns: txns.map(serializeCreditTxn), checkin: serializeCheckin(checkin) };
   });
 
-  // POST /me/checkin -> { award, streak }（每日一次）
+  // POST /me/checkin { day? } -> { award, streak }（每日一次）
+  // day 由客户端按其本地时区传入（"yyyy-MM-dd"），避免服务器 UTC 与客户端本地"今天"错位。
   app.post("/me/checkin", { preHandler: [app.authenticate] }, async (req) => {
-    const today = dayKey(new Date());
+    const bodyDay = String((req.body as { day?: string })?.day ?? "");
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(bodyDay) ? bodyDay : dayKey(new Date());
     const cur = await prisma.dailyCheckin.findUnique({ where: { userId: req.userId! } });
     if (cur?.lastDate === today) return { award: 0, streak: cur.streak };
 
-    const yesterday = dayKey(new Date(Date.now() - 86400_000));
+    const yesterday = dayKey(new Date(new Date(`${today}T00:00:00Z`).getTime() - 86400_000));
     const streak = cur?.lastDate === yesterday ? cur.streak + 1 : 1;
     await prisma.dailyCheckin.upsert({
       where: { userId: req.userId! },
