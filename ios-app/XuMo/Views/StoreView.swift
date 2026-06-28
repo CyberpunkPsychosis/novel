@@ -5,8 +5,9 @@ struct StoreView: View {
     @EnvironmentObject var store: LibraryStore
     private var feature: Book? { store.book(id: "qianfu") ?? store.books.first }
     private var newArrivals: [Book] { store.books.filter { !$0.isUserCreated } }
+    /// 综合热度榜（服务器）；未拉到时退回种子书。
     private var bestsellers: [Book] {
-        MockData.bestsellerOrder.compactMap { store.book(id: $0) }
+        store.rankedBooks.isEmpty ? store.books.filter { !$0.isUserCreated } : store.rankedBooks
     }
 
     var body: some View {
@@ -18,7 +19,7 @@ struct StoreView: View {
                         SectionHeader(title: "精辑推荐")
                         NavigationLink(value: feature.id) {
                             FeaturedCardView(book: feature, background: Color(hex: "#7C4A38"),
-                                             rating: MockData.rating(feature.id))
+                                             rating: feature.ratingAvg)
                         }.buttonStyle(.plain)
                     }
 
@@ -37,7 +38,7 @@ struct StoreView: View {
                     VStack(spacing: 0) {
                         ForEach(Array(bestsellers.enumerated()), id: \.element.id) { i, b in
                             NavigationLink(value: b.id) {
-                                RankRow(rank: i + 1, book: b, rating: MockData.rating(b.id))
+                                RankRow(rank: i + 1, book: b, rating: b.ratingAvg)
                             }.buttonStyle(.plain)
                             if i < bestsellers.count - 1 { Divider().background(Theme.line) }
                         }

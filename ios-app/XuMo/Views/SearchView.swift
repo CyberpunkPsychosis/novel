@@ -44,7 +44,7 @@ struct SearchView: View {
                             Text("没有匹配「\(query)」的作品。").font(.subheadline).foregroundStyle(Theme.sub).padding(.top, 24)
                         } else {
                             ForEach(results) { b in
-                                NavigationLink(value: b.id) { SearchResultRow(book: b, rating: MockData.rating(b.id)) }
+                                NavigationLink(value: b.id) { SearchResultRow(book: b, rating: b.ratingAvg) }
                                     .buttonStyle(.plain)
                             }
                         }

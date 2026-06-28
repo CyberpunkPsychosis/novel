@@ -24,14 +24,8 @@ struct HotTopic: Identifiable {
 }
 
 enum MockData {
-    /// 评分（书 id -> 0...5），用于精选/榜单/卡片展示。
-    static let ratings: [String: Double] = [
-        "fayan": 5.0, "qianfu": 4.5, "huisheng": 4.5, "yimian": 4.0
-    ]
-    static func rating(_ id: String) -> Double { ratings[id] ?? 4.5 }
-
-    /// 畅销榜单顺序（书 id）
-    static let bestsellerOrder = ["fayan", "huisheng", "qianfu", "yimian"]
+    // 评分与畅销榜已接服务器真数据（Book.ratingAvg / store.rankedBooks）。
+    // 社区话题/俱乐部/动态流仍为演示数据，留待后续里程碑。
 
     static let hotTopics: [HotTopic] = [
         .init(title: "#《回声邮局》的结局，你怎么读", count: 312, colorHex: "#6E7042"),

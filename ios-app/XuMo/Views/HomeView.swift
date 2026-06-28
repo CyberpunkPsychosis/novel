@@ -17,7 +17,7 @@ struct HomeView: View {
                     if let featured {
                         SectionHeader(title: "精选故事", showAll: true, allBooks: store.books.filter { !$0.isUserCreated })
                         NavigationLink(value: featured.id) {
-                            FeaturedCardView(book: featured, rating: MockData.rating(featured.id))
+                            FeaturedCardView(book: featured, rating: featured.ratingAvg)
                         }.buttonStyle(.plain)
                     }
 
@@ -26,7 +26,7 @@ struct HomeView: View {
                         HStack(alignment: .top, spacing: 14) {
                             ForEach(weekly) { b in
                                 NavigationLink(value: b.id) {
-                                    GridCoverCard(book: b, width: 100, rating: MockData.rating(b.id))
+                                    GridCoverCard(book: b, width: 100, rating: b.ratingAvg)
                                 }.buttonStyle(.plain)
                             }
                         }.padding(.horizontal, 2)

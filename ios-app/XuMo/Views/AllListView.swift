@@ -14,7 +14,7 @@ struct AllListView: View {
                 LazyVGrid(columns: grid, spacing: 18) {
                     ForEach(books) { b in
                         NavigationLink(value: b.id) {
-                            GridCoverCard(book: b, width: 100, rating: MockData.rating(b.id))
+                            GridCoverCard(book: b, width: 100, rating: b.ratingAvg)
                         }.buttonStyle(.plain)
                     }
                 }

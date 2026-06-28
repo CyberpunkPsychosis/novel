@@ -16,8 +16,12 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var forkRequests: [ForkRequest] = []
     /// 当前用户已解锁 fork/下载权的书 id
     @Published private(set) var unlockedBooks: Set<String> = []
-    /// bookID -> 审核状态（仅记非默认；缺省视为已通过）
+    /// bookID -> 审核状态（已废弃：审核状态随 Book.moderationStatus 下发，保留以免影响旧引用）
     @Published private(set) var moderation: [String: ModerationStatus] = [:]
+    /// 我对各书的评分（bookID -> 1...5）
+    @Published private(set) var myRatings: [String: Int] = [:]
+    /// 综合热度榜（GET /rankings）
+    @Published private(set) var rankedBooks: [Book] = []
 
     /// 服务器下发的书（含种子+他人已发布+我已同步的）；离线时来自缓存，再退到 bundle seed。
     private var serverBooks: [Book] = []
@@ -444,14 +448,54 @@ extension LibraryStore {
         }
     }
 
-    // MARK: 审核（仍本地 cosmetic 过场；真 DeepSeek 审核留里程碑3）
-    func moderationStatus(for bookID: String) -> ModerationStatus { moderation[bookID] ?? .approved }
+    // MARK: 审核（服务器 DeepSeek 真审核；状态随 Book 下发）
+    func moderationStatus(for bookID: String) -> ModerationStatus {
+        guard let raw = book(id: bookID)?.moderationStatus else { return .approved }
+        return ModerationStatus(rawValue: raw) ?? .approved
+    }
 
+    /// 上传后服务器异步审核；这里只在几秒后再刷一次书库，把"审核中→通过/驳回"拉回来。
     func submitForReview(_ bookID: String) {
-        moderation[bookID] = .pending
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
-            self?.moderation[bookID] = .approved
+        Task {
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            await refreshBooks()
         }
+    }
+
+    // MARK: 评分
+    /// 我对各书的评分缓存（bookID -> 1...5）。
+    @MainActor
+    func loadMyRatings() async {
+        if let r: [String: Int] = try? await APIClient.shared.request("/me/ratings", auth: true) {
+            myRatings = r
+        }
+    }
+    func myRating(for bookID: String) -> Int { myRatings[bookID] ?? 0 }
+
+    func rate(_ bookID: String, value: Int) {
+        myRatings[bookID] = value   // 乐观
+        Task {
+            let body = try? JSONEncoder().encode(["value": value])
+            _ = try? await APIClient.shared.request("/books/\(bookID)/rating", method: "POST", bodyData: body, auth: true) as RatingResponse
+            await refreshBooks()     // 拉回新的均值/人数
+            await loadMyRatings()
+        }
+    }
+
+    // MARK: 榜单
+    @MainActor
+    func loadRankings() async {
+        if let r: [Book] = try? await APIClient.shared.request("/rankings") {
+            rankedBooks = r
+        }
+    }
+
+    // MARK: 充值入账（StoreKit 校验后调用）
+    @MainActor
+    func grantPurchase(productId: String, transactionId: String) async {
+        let body = try? JSONEncoder().encode(["productId": productId, "transactionId": transactionId])
+        _ = try? await APIClient.shared.request("/me/credits/purchase", method: "POST", bodyData: body, auth: true) as BalanceResponse
+        await loadCredits()
     }
 
     // MARK: 平台数据同步（登录/启动把服务器真数据拉进 @Published 缓存）
@@ -462,6 +506,8 @@ extension LibraryStore {
         await loadNotifications()
         await loadIncomingRequests()
         await loadUnlocks()
+        await loadMyRatings()
+        await loadRankings()
     }
 
     @MainActor

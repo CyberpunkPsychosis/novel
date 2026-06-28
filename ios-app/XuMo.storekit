@@ -1,0 +1,75 @@
+{
+  "identifier" : "XUMO-STOREKIT-LOCAL",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "6.00",
+      "familyShareable" : false,
+      "internalID" : "1001",
+      "localizations" : [
+        {
+          "description" : "60 墨滴",
+          "displayName" : "60 墨滴",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.example.xumo.molzi.60",
+      "referenceName" : "molzi60",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "30.00",
+      "familyShareable" : false,
+      "internalID" : "1002",
+      "localizations" : [
+        {
+          "description" : "330 墨滴（含赠送）",
+          "displayName" : "330 墨滴",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.example.xumo.molzi.330",
+      "referenceName" : "molzi330",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "68.00",
+      "familyShareable" : false,
+      "internalID" : "1003",
+      "localizations" : [
+        {
+          "description" : "800 墨滴（含赠送）",
+          "displayName" : "800 墨滴",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.example.xumo.molzi.800",
+      "referenceName" : "molzi800",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "128.00",
+      "familyShareable" : false,
+      "internalID" : "1004",
+      "localizations" : [
+        {
+          "description" : "1600 墨滴（含赠送）",
+          "displayName" : "1600 墨滴",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.example.xumo.molzi.1600",
+      "referenceName" : "molzi1600",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

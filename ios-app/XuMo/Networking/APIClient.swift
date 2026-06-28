@@ -115,3 +115,4 @@ struct CreditsResponse: Decodable {
 }
 struct CheckinResponse: Decodable { let award: Int; let streak: Int }
 struct BalanceResponse: Decodable { let balance: Int }
+struct RatingResponse: Decodable { let ratingAvg: Double; let ratingCount: Int; let mine: Int }

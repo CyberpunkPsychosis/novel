@@ -1,6 +1,7 @@
 import SwiftUI
+import StoreKit
 
-/// 墨滴钱包：余额 + 每日签到 + 流水 + Mock 买墨滴。
+/// 墨滴钱包：余额 + 每日签到 + 流水 + Apple 内购买墨滴。
 struct WalletView: View {
     @EnvironmentObject var store: LibraryStore
     @State private var showBuy = false
@@ -92,11 +93,12 @@ private struct TxnRow: View {
     }
 }
 
-/// Mock 买墨滴（不接真实 IAP；上线前替换为 StoreKit）。
+/// 买墨滴：Apple 内购（StoreKit 2）。校验交易后由后端入账。
 struct BuyMolDiSheet: View {
     @EnvironmentObject var store: LibraryStore
     @Environment(\.dismiss) private var dismiss
-    private let packs = [(100, "¥6"), (300, "¥18"), (680, "¥38"), (1280, "¥68")]
+    @StateObject private var iap = IAPStore()
+    @State private var toast: String?
 
     var body: some View {
         NavigationStack {
@@ -105,33 +107,57 @@ struct BuyMolDiSheet: View {
                 ScrollView {
                     VStack(spacing: 14) {
                         Text("选择墨滴套餐").font(Theme.serif(18, .semibold)).foregroundStyle(Theme.ink).padding(.top, 8)
-                        ForEach(packs, id: \.0) { pack in
-                            Button {
-                                store.buyMolDi(pack.0); dismiss()
-                            } label: {
-                                HStack {
-                                    Image(systemName: "drop.fill").foregroundStyle(Theme.terracotta)
-                                    Text("\(pack.0) 墨滴").font(.headline).foregroundStyle(Theme.ink)
-                                    Spacer()
-                                    Text(pack.1).font(.subheadline.weight(.bold)).foregroundStyle(.white)
-                                        .padding(.horizontal, 16).padding(.vertical, 7)
-                                        .background(Theme.terraDeep).clipShape(Capsule())
-                                }
-                                .padding(16)
-                                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.surface))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line, lineWidth: 1))
-                            }.buttonStyle(.plain)
+
+                        if iap.products.isEmpty {
+                            ProgressView("加载商品…").padding(.top, 24)
+                        } else {
+                            ForEach(iap.products, id: \.id) { p in
+                                Button { buy(p) } label: { packRow(p) }
+                                    .buttonStyle(.plain)
+                                    .disabled(iap.busy)
+                            }
                         }
-                        Text("原型演示：点了直接到账，未接入真实支付。\n上线版将走 Apple 内购（StoreKit）。")
+
+                        Text("通过 Apple 内购支付；交易由 Apple 校验后到账。")
                             .font(.caption2).foregroundStyle(Theme.sub)
                             .multilineTextAlignment(.center).padding(.top, 8)
                     }
                     .padding(20)
                 }
+                if iap.busy { ProgressView().scaleEffect(1.3).tint(Theme.terraDeep) }
+                if let toast { ToastView(text: toast) }
             }
             .navigationTitle("买墨滴")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("关闭") { dismiss() } } }
+            .task { await iap.load() }
+        }
+    }
+
+    @ViewBuilder private func packRow(_ p: Product) -> some View {
+        HStack {
+            Image(systemName: "drop.fill").foregroundStyle(Theme.terracotta)
+            Text("\(IAPStore.credits(for: p.id)) 墨滴").font(.headline).foregroundStyle(Theme.ink)
+            Spacer()
+            Text(p.displayPrice).font(.subheadline.weight(.bold)).foregroundStyle(.white)
+                .padding(.horizontal, 16).padding(.vertical, 7)
+                .background(Theme.terraDeep).clipShape(Capsule())
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.surface))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.line, lineWidth: 1))
+    }
+
+    private func buy(_ p: Product) {
+        Task { @MainActor in
+            let credited = await iap.purchase(p) { productId, txnId in
+                await store.grantPurchase(productId: productId, transactionId: txnId)
+            }
+            if let credited, credited > 0 {
+                toast = "充值成功 +\(credited) 墨滴"
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                dismiss()
+            }
         }
     }
 }

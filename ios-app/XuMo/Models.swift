@@ -28,11 +28,17 @@ struct Book: Codable, Identifiable, Hashable {
     /// 是否用户在本机创建（区分种子书与"我的创作"）。
     var isUserCreated: Bool = false
     var chapters: [Chapter]
+    /// 服务器审核状态：approved / pending / rejected（缺省视为 approved）。
+    var moderationStatus: String = "approved"
+    /// 服务器聚合的评分均值与人数。
+    var ratingAvg: Double = 0
+    var ratingCount: Int = 0
 
     enum CodingKeys: String, CodingKey {
         case id, title, author, blurb, tags, tagline
         case coverColors, coverAccent, status
         case forkOf, forkFromChapter, isUserCreated, chapters
+        case moderationStatus, ratingAvg, ratingCount
     }
 }
 
@@ -53,5 +59,8 @@ extension Book {
         forkFromChapter = try? c.decodeIfPresent(Int.self, forKey: .forkFromChapter)
         isUserCreated = (try? c.decode(Bool.self, forKey: .isUserCreated)) ?? false
         chapters = (try? c.decode([Chapter].self, forKey: .chapters)) ?? []
+        moderationStatus = (try? c.decode(String.self, forKey: .moderationStatus)) ?? "approved"
+        ratingAvg = (try? c.decode(Double.self, forKey: .ratingAvg)) ?? 0
+        ratingCount = (try? c.decode(Int.self, forKey: .ratingCount)) ?? 0
     }
 }

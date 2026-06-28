@@ -25,7 +25,7 @@ struct BookDetailView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(book.title).font(Theme.serif(24, .bold)).foregroundStyle(Theme.ink)
                             Text(book.author).font(.subheadline).foregroundStyle(Theme.sub)
-                            RatingStars(value: MockData.rating(book.id))
+                            RatingStars(value: book.ratingAvg)
                             HStack(spacing: 6) {
                                 if !book.status.isEmpty { TagChip(text: book.status, color: Theme.bronze) }
                                 ModerationBadge(status: moderation)
@@ -47,6 +47,8 @@ struct BookDetailView: View {
                     }
 
                     Text(book.blurb).font(.body).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(4)
+
+                    RatingRow(book: book)
 
                     HStack(spacing: 12) {
                         NavigationLink {
@@ -169,6 +171,39 @@ struct BookDetailView: View {
 
     private func clearToast() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { toast = nil }
+    }
+}
+
+/// 评分行：显示均值/人数 + 我的可点评分（点星即上报服务器）。
+struct RatingRow: View {
+    @EnvironmentObject var store: LibraryStore
+    let book: Book
+    private var mine: Int { store.myRating(for: book.id) }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(book.ratingCount > 0 ? String(format: "%.1f", book.ratingAvg) : "暂无评分")
+                    .font(Theme.serif(18, .bold)).foregroundStyle(Theme.ink)
+                if book.ratingCount > 0 {
+                    Text("\(book.ratingCount) 人评分").font(.caption2).foregroundStyle(Theme.sub)
+                }
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(mine > 0 ? "我的评分" : "点星评分").font(.caption2).foregroundStyle(Theme.sub)
+                HStack(spacing: 3) {
+                    ForEach(1...5, id: \.self) { i in
+                        Image(systemName: i <= mine ? "star.fill" : "star")
+                            .font(.system(size: 16))
+                            .foregroundStyle(i <= mine ? Theme.bronze : Theme.line)
+                            .onTapGesture { store.rate(book.id, value: i) }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
     }
 }
 
