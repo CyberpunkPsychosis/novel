@@ -23,8 +23,9 @@ enum Theme {
     static func applyAppearance() {
         let inkUI = UIColor(ink)
         let nav = UINavigationBarAppearance()
-        nav.configureWithOpaqueBackground()
-        nav.backgroundColor = UIColor(cream)
+        // 透明导航栏：让每屏的植物线描背景从顶部连续透上来，不再有突兀的横切线。
+        nav.configureWithTransparentBackground()
+        nav.backgroundColor = .clear
         nav.shadowColor = .clear
         if let d = UIFontDescriptor.preferredFontDescriptor(withTextStyle: .largeTitle).withDesign(.serif) {
             nav.largeTitleTextAttributes = [.foregroundColor: inkUI, .font: UIFont(descriptor: d, size: 0)]

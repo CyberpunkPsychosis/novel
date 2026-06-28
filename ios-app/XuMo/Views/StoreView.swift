@@ -22,7 +22,7 @@ struct StoreView: View {
                         }.buttonStyle(.plain)
                     }
 
-                    SectionHeader(title: "新书上架", showAll: true)
+                    SectionHeader(title: "新书上架", showAll: true, allBooks: newArrivals)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 14) {
                             ForEach(newArrivals) { b in

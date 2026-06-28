@@ -61,7 +61,7 @@ struct ForkComposerView: View {
                     } header: {
                         Text("正文")
                     } footer: {
-                        Text("用你习惯的任何 AI 或纯手写都行，写好粘进来。平台只负责发布与改编关系，不限制你怎么创作。")
+                        Text("用你习惯的任何 AI 或纯手写都行，写好粘进来。平台不替你写作，只负责发布、改编授权与读者社区；上传后会自动过一遍审核。")
                     }
                     .listRowBackground(Theme.surface)
                 }

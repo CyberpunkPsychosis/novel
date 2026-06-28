@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  开发期 ATS 例外：允许明文 HTTP，便于模拟器打 http://localhost:3000、
+	  真机打 http://<ECS 公网 IP>:3000 调试。
+	  上线务必删除本例外、改用 HTTPS（备案 + certbot 后）。
+	  其余 Info.plist 键由 Xcode 的 GENERATE_INFOPLIST_FILE 自动合并。
+	  放在工程根目录（而非 XuMo/ 同步文件夹）以免被当成 bundle 资源重复拷贝。
+	-->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

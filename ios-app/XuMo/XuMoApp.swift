@@ -14,12 +14,17 @@ struct XuMoApp: App {
     }
 }
 
-/// 启动闪屏 → 淡入主界面
+/// 启动闪屏 → 按登录态进 登录页 / 主界面
 struct RootContainer: View {
+    @EnvironmentObject var store: LibraryStore
     @State private var showSplash = true
     var body: some View {
         ZStack {
-            MainTabView()
+            if store.isLoggedIn {
+                MainTabView()
+            } else {
+                AuthView()
+            }
             if showSplash {
                 SplashView().transition(.opacity)
             }
@@ -27,6 +32,12 @@ struct RootContainer: View {
         .task {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             withAnimation(.easeInOut(duration: 0.5)) { showSplash = false }
+        }
+        // 已登录（含重装后 Keychain 仍在）时，冷启动拉一次云端书库与进度。
+        .task(id: store.isLoggedIn) {
+            guard store.isLoggedIn else { return }
+            await store.refreshBooks()
+            await store.loadRemoteProgress()
         }
     }
 }

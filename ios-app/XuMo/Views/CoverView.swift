@@ -14,16 +14,19 @@ struct CoverView: View {
     private var accent: Color { Color(hex: book.coverAccent) }
 
     var body: some View {
-        Group {
-            if let img = realCover {
-                Image(uiImage: img).resizable().scaledToFill()
-            } else {
-                proceduralCover
+        // 用固定 3:4 的空盒子锚定尺寸，封面填满后裁掉溢出，
+        // 无论原图比例如何，所有封面都严格 3:4、等高对齐。
+        Color.clear
+            .aspectRatio(3.0/4.0, contentMode: .fit)
+            .overlay {
+                if let img = realCover {
+                    Image(uiImage: img).resizable().scaledToFill()
+                } else {
+                    proceduralCover
+                }
             }
-        }
-        .aspectRatio(3.0/4.0, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-        .shadow(color: Theme.ink.opacity(0.18), radius: 6, x: 0, y: 3)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .shadow(color: Theme.ink.opacity(0.18), radius: 6, x: 0, y: 3)
     }
 
     private var proceduralCover: some View {

@@ -7,20 +7,60 @@ final class LibraryStore: ObservableObject {
     /// bookID -> 最近读到的章节 index
     @Published private(set) var readingProgress: [String: Int] = [:]
 
+    // MARK: 平台状态（账号 / 墨滴 / 通知 / 授权 / 审核）
+    @Published var currentUser: LocalUser?
+    @Published private(set) var creditTxns: [CreditTxn] = []
+    @Published private(set) var checkin = DailyCheckin()
+    @Published private(set) var notifications: [AppNotification] = []
+    @Published private(set) var permissions: [String: ForkPermission] = [:]
+    @Published private(set) var forkRequests: [ForkRequest] = []
+    /// 当前用户已解锁 fork/下载权的书 id
+    @Published private(set) var unlockedBooks: Set<String> = []
+    /// bookID -> 审核状态（仅记非默认；缺省视为已通过）
+    @Published private(set) var moderation: [String: ModerationStatus] = [:]
+
+    /// 服务器下发的书（含种子+他人已发布+我已同步的）；离线时来自缓存，再退到 bundle seed。
+    private var serverBooks: [Book] = []
+
     private let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     private var userBooksURL: URL { docs.appendingPathComponent("userBooks.json") }
+    private var remoteCacheURL: URL { docs.appendingPathComponent("remoteBooks.json") }
     private var progressURL: URL { docs.appendingPathComponent("progress.json") }
+    private var userURL: URL { docs.appendingPathComponent("user.json") }
+    private var creditsURL: URL { docs.appendingPathComponent("credits.json") }
+    private var checkinURL: URL { docs.appendingPathComponent("checkin.json") }
+    private var notifURL: URL { docs.appendingPathComponent("notifications.json") }
+    private var permURL: URL { docs.appendingPathComponent("permissions.json") }
+    private var forkReqURL: URL { docs.appendingPathComponent("forkRequests.json") }
+    private var unlocksURL: URL { docs.appendingPathComponent("unlocks.json") }
 
     init() {
         reload()
         loadProgress()
         if readingProgress.isEmpty { seedDemoProgress() }
+        loadPlatform()
     }
 
     func reload() {
-        var all = Self.loadSeed()
-        all.append(contentsOf: loadUserBooks())
-        books = all
+        // 服务器书：优先本地缓存，离线/首启回退到 bundle 内 seed.json。
+        serverBooks = loadRemoteCache() ?? Self.loadSeed()
+        rebuild()
+    }
+
+    /// 合并「服务器书 + 仅本地的书（未上云的草稿/本地 fork）」，服务器优先、按 id 去重。
+    private func rebuild() {
+        let serverIDs = Set(serverBooks.map { $0.id })
+        var out = serverBooks
+        out.append(contentsOf: loadUserBooks().filter { !serverIDs.contains($0.id) })
+        books = out
+    }
+
+    private func loadRemoteCache() -> [Book]? {
+        guard let data = try? Data(contentsOf: remoteCacheURL) else { return nil }
+        return try? JSONDecoder().decode([Book].self, from: data)
+    }
+    private func saveRemoteCache(_ b: [Book]) {
+        if let data = try? JSONEncoder().encode(b) { try? data.write(to: remoteCacheURL, options: .atomic) }
     }
 
     // MARK: 查询
@@ -34,6 +74,13 @@ final class LibraryStore: ObservableObject {
     func markRead(bookID: String, chapterIndex: Int) {
         readingProgress[bookID] = chapterIndex
         saveProgress()
+        // 异步上报进度（失败不阻塞阅读，下次登录/翻页再同步）。
+        guard isLoggedIn else { return }
+        Task {
+            let body = try? JSONEncoder().encode(ProgressPayload(bookId: bookID, chapterIndex: chapterIndex))
+            _ = try? await APIClient.shared.request("/me/progress", method: "PUT",
+                                                    bodyData: body, auth: true) as OKResponse
+        }
     }
     func lastReadIndex(_ bookID: String) -> Int? { readingProgress[bookID] }
 
@@ -72,10 +119,11 @@ final class LibraryStore: ObservableObject {
                             title: t.isEmpty ? "第\(nextIndex)章" : t,
                             content: newContent.trimmingCharacters(in: .whitespacesAndNewlines)))
         let label = (mode == .continuation) ? "续写" : "改编"
+        let author = !myPenName.isEmpty ? myPenName : (currentUser?.penName ?? "我")
         let new = Book(
             id: "user-\(UUID().uuidString.prefix(8))",
             title: "\(parent.title)·\(label)",
-            author: myPenName.isEmpty ? "我" : myPenName,
+            author: author,
             blurb: "\(label)自《\(parent.title)》。" + String(parent.blurb.prefix(40)),
             tags: parent.tags, tagline: "\(label)自《\(parent.title)》",
             coverColors: parent.coverColors, coverAccent: parent.coverAccent,
@@ -83,11 +131,51 @@ final class LibraryStore: ObservableObject {
             forkFromChapter: (mode == .adaptation) ? fromChapter : nil,
             isUserCreated: true, chapters: base)
         var mine = loadUserBooks(); mine.append(new); saveUserBooks(mine); reload()
+        submitForReview(new.id)                  // 上传走"审核中→通过"
         return new
     }
 
     func deleteUserBook(id: String) {
         var mine = loadUserBooks(); mine.removeAll { $0.id == id }; saveUserBooks(mine); reload()
+    }
+
+    /// 上传一部原创新作（非 fork）。作者用外部 AI/手写完成后粘进来。
+    @discardableResult
+    func createOriginal(title: String, blurb: String, tags: [String],
+                        firstChapterTitle: String, content: String) -> Book {
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let new = Book(
+            id: "user-\(UUID().uuidString.prefix(8))",
+            title: t.isEmpty ? "未命名新作" : t,
+            author: currentUser?.penName ?? "我",
+            blurb: blurb.trimmingCharacters(in: .whitespacesAndNewlines),
+            tags: tags, tagline: "原创",
+            coverColors: ["#1A2332", "#3a2a22", "#6E7042"], coverAccent: "#C7A17A",
+            status: "创作中", forkOf: nil, forkFromChapter: nil, isUserCreated: true,
+            chapters: [Chapter(index: 1,
+                               title: firstChapterTitle.isEmpty ? "第1章" : firstChapterTitle,
+                               content: content.trimmingCharacters(in: .whitespacesAndNewlines))])
+        var mine = loadUserBooks(); mine.append(new); saveUserBooks(mine); reload()
+        submitForReview(new.id)
+        // 立即落本地草稿（离线可用），同时尝试上云；成功后服务器版替换本地草稿。
+        Task { await uploadBook(new) }
+        return new
+    }
+
+    /// 把本地新作上传到服务器；成功则删本地草稿并刷新（避免重复显示）。
+    private func uploadBook(_ local: Book) async {
+        guard isLoggedIn else { return }
+        do {
+            let body = try JSONEncoder().encode(NewBookPayload(from: local))
+            let _: Book = try await APIClient.shared.request("/books", method: "POST",
+                                                             bodyData: body, auth: true)
+            await MainActor.run {
+                var mine = loadUserBooks(); mine.removeAll { $0.id == local.id }; saveUserBooks(mine)
+            }
+            await refreshBooks()
+        } catch {
+            // 上云失败：保留本地草稿，下次可重试。
+        }
     }
 
     // MARK: 持久化
@@ -115,6 +203,326 @@ final class LibraryStore: ObservableObject {
         let demo = ["huisheng": 6, "fayan": 28, "yimian": 4]
         for (id, idx) in demo where book(id: id) != nil { readingProgress[id] = idx }
         saveProgress()
+    }
+}
+
+// MARK: - 平台功能（账号 / 墨滴 / 通知 / 授权 / 审核 / 分支图）
+extension LibraryStore {
+
+    // MARK: 加载 / 持久化助手
+    func loadPlatform() {
+        currentUser   = decode(userURL, LocalUser.self)
+        creditTxns    = decode(creditsURL, [CreditTxn].self) ?? []
+        checkin       = decode(checkinURL, DailyCheckin.self) ?? DailyCheckin()
+        notifications = decode(notifURL, [AppNotification].self) ?? []
+        permissions   = decode(permURL, [String: ForkPermission].self) ?? [:]
+        forkRequests  = decode(forkReqURL, [ForkRequest].self) ?? []
+        unlockedBooks = Set(decode(unlocksURL, [String].self) ?? [])
+        if permissions.isEmpty { seedDemoPermissions() }
+    }
+
+    private func decode<T: Decodable>(_ url: URL, _ type: T.Type) -> T? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+    private func save<T: Encodable>(_ value: T, to url: URL) {
+        if let data = try? JSONEncoder().encode(value) { try? data.write(to: url, options: .atomic) }
+    }
+
+    // MARK: 账号
+    var isLoggedIn: Bool { currentUser != nil }
+
+    /// 本地假鉴权：登录 = 注册（无密码库）。新号送注册奖励墨滴。
+    func register(handle: String, penName: String) {
+        let h = handle.trimmingCharacters(in: .whitespaces).isEmpty ? "reader" : handle
+        let p = penName.trimmingCharacters(in: .whitespaces).isEmpty ? h : penName
+        currentUser = LocalUser(id: h, handle: h, penName: p)
+        save(currentUser, to: userURL)
+        if creditTxns.isEmpty { addCredits(100, reason: .signup, note: "欢迎加入书艺之阁") }
+        seedDemoNotifications()
+    }
+
+    func logout() {
+        currentUser = nil
+        TokenStore.clear()
+        try? FileManager.default.removeItem(at: userURL)
+    }
+
+    // MARK: 真实登录（接后端 · 里程碑1）
+    @MainActor
+    func signInWithApple(identityToken: String, penName: String?) async throws {
+        let body = try JSONEncoder().encode(ApplePayload(identityToken: identityToken, penName: penName))
+        let res: AuthResponse = try await APIClient.shared.request("/auth/apple", method: "POST", bodyData: body)
+        await applyLogin(res)
+    }
+
+    /// 开发期邮箱通道（没有 Apple 开发者账号时用；后端 DEV_EMAIL_LOGIN=true 才开）。
+    @MainActor
+    func devLogin(email: String, penName: String?) async throws {
+        let body = try JSONEncoder().encode(DevLoginPayload(email: email, penName: penName))
+        let res: AuthResponse = try await APIClient.shared.request("/auth/dev", method: "POST", bodyData: body)
+        await applyLogin(res)
+    }
+
+    @MainActor
+    private func applyLogin(_ res: AuthResponse) async {
+        TokenStore.token = res.token
+        currentUser = res.user
+        save(currentUser, to: userURL)
+        postLoginBootstrap()
+        await refreshBooks()
+        await loadRemoteProgress()
+    }
+
+    /// 登录后初始化本地 mock 平台数据（墨滴/通知本期仍本地）。
+    private func postLoginBootstrap() {
+        if creditTxns.isEmpty { addCredits(100, reason: .signup, note: "欢迎加入书艺之阁") }
+        seedDemoNotifications()
+    }
+
+    // MARK: 云端书库 / 进度同步
+    @MainActor
+    func refreshBooks() async {
+        do {
+            let remote: [Book] = try await APIClient.shared.request("/books")
+            serverBooks = remote
+            saveRemoteCache(remote)
+            // 已同步到服务器的本地草稿就地删除，避免重复。
+            let ids = Set(remote.map { $0.id })
+            var mine = loadUserBooks()
+            let before = mine.count
+            mine.removeAll { ids.contains($0.id) }
+            if mine.count != before { saveUserBooks(mine) }
+            rebuild()
+        } catch {
+            // 离线/失败：保留当前 serverBooks（缓存或 seed），不清空。
+        }
+    }
+
+    @MainActor
+    func loadRemoteProgress() async {
+        do {
+            let p: [String: Int] = try await APIClient.shared.request("/me/progress", auth: true)
+            readingProgress = p
+            saveProgress()
+        } catch {
+            // 离线：保留本地进度。
+        }
+    }
+
+    // MARK: 墨滴
+    var molDi: Int { creditTxns.reduce(0) { $0 + $1.delta } }
+
+    func addCredits(_ amount: Int, reason: CreditReason, note: String = "") {
+        creditTxns.insert(CreditTxn(delta: amount, reason: reason, note: note, date: Date()), at: 0)
+        save(creditTxns, to: creditsURL)
+    }
+    @discardableResult
+    func spendCredits(_ amount: Int, reason: CreditReason, note: String = "") -> Bool {
+        guard molDi >= amount else { return false }
+        addCredits(-amount, reason: reason, note: note)
+        return true
+    }
+    /// Mock 买墨滴（不接真实 IAP，上线前替换为 StoreKit）。
+    func buyMolDi(_ amount: Int) { addCredits(amount, reason: .buy, note: "购买 \(amount) 墨滴") }
+
+    // MARK: 每日签到
+    var canCheckinToday: Bool { checkin.lastDate != DayKey.key(Date()) }
+
+    @discardableResult
+    func doCheckin() -> Int {
+        let today = DayKey.key(Date())
+        guard checkin.lastDate != today else { return 0 }
+        let yesterday = DayKey.key(Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date())
+        checkin.streak = (checkin.lastDate == yesterday) ? checkin.streak + 1 : 1
+        checkin.lastDate = today
+        save(checkin, to: checkinURL)
+        let award = 10 + min(checkin.streak, 7) * 2
+        addCredits(award, reason: .checkin, note: "连续签到 \(checkin.streak) 天")
+        pushNotification(.checkin, text: "签到成功 +\(award) 墨滴（连续 \(checkin.streak) 天）")
+        return award
+    }
+
+    // MARK: 通知
+    var unreadCount: Int { notifications.filter { !$0.read }.count }
+
+    func pushNotification(_ type: NotifType, actor: String = "", text: String) {
+        notifications.insert(AppNotification(type: type, actor: actor, text: text, date: Date()), at: 0)
+        save(notifications, to: notifURL)
+    }
+    func markAllNotificationsRead() {
+        notifications = notifications.map { var n = $0; n.read = true; return n }
+        save(notifications, to: notifURL)
+    }
+
+    // MARK: 授权 / 所有权
+    func isOwner(_ book: Book) -> Bool {
+        book.isUserCreated && book.author == currentUser?.penName
+    }
+    func permission(for bookID: String) -> ForkPermission { permissions[bookID] ?? ForkPermission() }
+    func setPermission(_ p: ForkPermission, for bookID: String) {
+        permissions[bookID] = p; save(permissions, to: permURL)
+    }
+
+    // MARK: fork 解锁 / 申请
+    func hasForkAccess(_ book: Book) -> Bool { isOwner(book) || unlockedBooks.contains(book.id) }
+
+    @discardableResult
+    func unlockFork(_ book: Book) -> Bool {
+        let price = permission(for: book.id).priceMolDi
+        if price > 0 {
+            guard spendCredits(price, reason: .fork, note: "解锁《\(book.title)》改编权") else { return false }
+        }
+        unlockedBooks.insert(book.id); save(Array(unlockedBooks), to: unlocksURL)
+        pushNotification(.system, text: "已解锁《\(book.title)》的改编/下载权")
+        return true
+    }
+
+    func requestFork(book: Book, fromChapter: Int, mode: String) {
+        let req = ForkRequest(requester: currentUser?.penName ?? "我", bookID: book.id,
+                              fromChapter: fromChapter, mode: mode, date: Date())
+        forkRequests.insert(req, at: 0); save(forkRequests, to: forkReqURL)
+        pushNotification(.forkRequest, actor: currentUser?.penName ?? "我",
+                         text: "已向《\(book.title)》作者发出\(mode)申请，等待同意")
+    }
+
+    /// 我作为作者收到的改编/续写申请（针对我创作的书）。
+    var incomingForkRequests: [ForkRequest] {
+        forkRequests.filter { req in book(id: req.bookID).map { isOwner($0) } ?? false }
+    }
+
+    func decide(_ req: ForkRequest, approve: Bool) {
+        guard let i = forkRequests.firstIndex(where: { $0.id == req.id }) else { return }
+        forkRequests[i].status = approve ? .approved : .denied
+        save(forkRequests, to: forkReqURL)
+        let title = book(id: req.bookID)?.title ?? ""
+        if approve { addCredits(15, reason: .royalty, note: "《\(title)》被\(req.mode)分成") }
+        pushNotification(approve ? .forkApproved : .forkDenied, actor: req.requester,
+            text: approve ? "你同意了 @\(req.requester) 对《\(title)》的\(req.mode)"
+                          : "你拒绝了 @\(req.requester) 对《\(title)》的\(req.mode)")
+    }
+
+    // MARK: 审核
+    func moderationStatus(for bookID: String) -> ModerationStatus { moderation[bookID] ?? .approved }
+
+    /// 上传 → 审核中 → （模拟延时）通过。真实接 DeepSeek 在后端阶段。
+    func submitForReview(_ bookID: String) {
+        moderation[bookID] = .pending
+        pushNotification(.system, text: "作品已提交，正在自动审核…")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self else { return }
+            self.moderation[bookID] = .approved
+            let t = self.book(id: bookID)?.title ?? "作品"
+            self.pushNotification(.system, text: "《\(t)》已通过审核，现已发布")
+            self.seedDemoIncomingRequest(for: bookID)
+        }
+    }
+
+    // MARK: 演示数据
+    private func seedDemoPermissions() {
+        // 一本种子书设为"花墨滴直接解锁"，演示付费 fork；其余默认需作者审批。
+        permissions["fayan"] = ForkPermission(allowContinue: true, allowAdapt: true,
+            requireApproval: false, allowDownload: true, priceMolDi: 30)
+        save(permissions, to: permURL)
+    }
+    private func seedDemoNotifications() {
+        guard notifications.isEmpty else { return }
+        pushNotification(.newBranch, actor: "南风", text: "南风 为《回声邮局》开了新支线「他回信了」")
+        pushNotification(.system, text: "欢迎来到书艺之阁，记得每天来签到领墨滴。")
+    }
+    private func seedDemoIncomingRequest(for bookID: String) {
+        guard !forkRequests.contains(where: { $0.bookID == bookID && $0.requester == "林晚" }) else { return }
+        let req = ForkRequest(requester: "林晚", bookID: bookID, fromChapter: 1, mode: "续写", date: Date())
+        forkRequests.insert(req, at: 0); save(forkRequests, to: forkReqURL)
+        pushNotification(.forkRequest, actor: "林晚",
+                         text: "林晚 想续写你的《\(book(id: bookID)?.title ?? "")》，待你同意")
+    }
+
+    // MARK: 分支图
+    func branchGraph(for root: Book) -> BranchGraph {
+        root.id == "huisheng" ? demoHuishengGraph() : spineWithChildren(root)
+    }
+
+    private func nodeID(_ bookID: String, _ idx: Int) -> String { "\(bookID)#\(idx)" }
+
+    /// 节点 → 实际正文（真实章节取书里的；合成支线取 node.content）。
+    func nodeText(_ node: BranchNode) -> (title: String, body: String) {
+        if let b = book(id: node.bookID), let ch = b.chapters.first(where: { $0.index == node.chapterIndex }) {
+            return (ch.title, ch.content)
+        }
+        return (node.title, node.content ?? "（\(node.authorName) 续写的支线）")
+    }
+
+    /// 通用：主书线性脊柱 + 真实 fork 子书作为支线。
+    private func spineWithChildren(_ root: Book) -> BranchGraph {
+        var nodes: [BranchNode] = []; var edges: [BranchEdge] = []
+        let spine = root.chapters.sorted { $0.index < $1.index }
+        let hasForks = !forks(of: root.id).isEmpty
+        for (i, ch) in spine.enumerated() {
+            nodes.append(BranchNode(id: nodeID(root.id, ch.index), bookID: root.id,
+                                    chapterIndex: ch.index, title: ch.title, authorName: root.author,
+                                    isEnding: i == spine.count - 1 && !hasForks))
+            if i > 0 {
+                edges.append(BranchEdge(from: nodeID(root.id, spine[i-1].index),
+                                        to: nodeID(root.id, ch.index), type: .linear))
+            }
+        }
+        for child in forks(of: root.id) {
+            let forkPoint = child.forkFromChapter ?? (root.chapters.map { $0.index }.max() ?? 0)
+            let newCh = child.chapters.filter { $0.index > forkPoint }.sorted { $0.index < $1.index }
+            guard let first = newCh.first else { continue }
+            edges.append(BranchEdge(from: nodeID(root.id, forkPoint), to: nodeID(child.id, first.index),
+                                    type: .branch, label: child.tagline, branchAuthor: child.author))
+            for (j, ch) in newCh.enumerated() {
+                nodes.append(BranchNode(id: nodeID(child.id, ch.index), bookID: child.id,
+                                        chapterIndex: ch.index, title: ch.title, authorName: child.author,
+                                        isEnding: j == newCh.count - 1))
+                if j > 0 {
+                    edges.append(BranchEdge(from: nodeID(child.id, newCh[j-1].index),
+                                            to: nodeID(child.id, ch.index), type: .linear))
+                }
+            }
+        }
+        return BranchGraph(nodes: nodes, edges: edges)
+    }
+
+    /// 手写的《回声邮局》三向分叉 + 合流，演示流程图与分支阅读。
+    private func demoHuishengGraph() -> BranchGraph {
+        let A = LocalUser.seedAuthorName    // 观山海（原作）
+        func real(_ i: Int) -> BranchNode {
+            let t = book(id: "huisheng")?.chapters.first { $0.index == i }?.title ?? "第\(i)章"
+            return BranchNode(id: nodeID("huisheng", i), bookID: "huisheng", chapterIndex: i, title: t, authorName: A)
+        }
+        func synth(_ id: String, _ title: String, _ author: String, _ body: String, end: Bool = false) -> BranchNode {
+            BranchNode(id: id, bookID: "huisheng-demo", chapterIndex: -1, title: title,
+                       authorName: author, isEnding: end, content: body)
+        }
+        let nodes: [BranchNode] = [
+            real(1), real(2), real(3), real(4),
+            BranchNode(id: nodeID("huisheng", 5), bookID: "huisheng", chapterIndex: 5,
+                       title: book(id: "huisheng")?.chapters.first { $0.index == 5 }?.title ?? "第5章",
+                       authorName: A, isEnding: true),
+            synth("burn-1", "烧掉那封信", "阿澄", "她终究没有寄出去。火舌舔过信纸的一角，字迹蜷缩、发黑，像从未存在过。"),
+            synth("burn-2", "灰烬里的回声", "阿澄", "多年以后她仍能背出每一个字。有些话烧掉了，反而再也忘不掉。", end: true),
+            synth("deliver-1", "亲手送去", "南风", "她把信揣进怀里，坐了三个小时的车。门开的那一刻，所有预想的台词都哑了。"),
+        ]
+        let edges: [BranchEdge] = [
+            BranchEdge(from: nodeID("huisheng", 1), to: nodeID("huisheng", 2), type: .linear),
+            BranchEdge(from: nodeID("huisheng", 2), to: nodeID("huisheng", 3), type: .linear),
+            // 第3章是分叉点：三个选择
+            BranchEdge(from: nodeID("huisheng", 3), to: nodeID("huisheng", 4), type: .branch,
+                       label: "寄出那封信", branchAuthor: A),
+            BranchEdge(from: nodeID("huisheng", 3), to: "burn-1", type: .branch,
+                       label: "烧掉那封信", branchAuthor: "阿澄"),
+            BranchEdge(from: nodeID("huisheng", 3), to: "deliver-1", type: .branch,
+                       label: "亲手送去", branchAuthor: "南风"),
+            // 烧信线走向独立结局
+            BranchEdge(from: "burn-1", to: "burn-2", type: .linear),
+            // 寄信线 与 亲手送去线 都合流回主线第5章
+            BranchEdge(from: nodeID("huisheng", 4), to: nodeID("huisheng", 5), type: .linear),
+            BranchEdge(from: "deliver-1", to: nodeID("huisheng", 5), type: .merge),
+        ]
+        return BranchGraph(nodes: nodes, edges: edges)
     }
 }
 

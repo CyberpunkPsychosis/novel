@@ -12,16 +12,16 @@ struct HomeView: View {
             ScreenBackground(opacity: 0.5)
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    SearchBarStub(title: "书艺之阁")
+                    HomeTopBar(title: "书艺之阁", unread: store.unreadCount)
 
                     if let featured {
-                        SectionHeader(title: "精选故事", showAll: true)
+                        SectionHeader(title: "精选故事", showAll: true, allBooks: store.books.filter { !$0.isUserCreated })
                         NavigationLink(value: featured.id) {
                             FeaturedCardView(book: featured, rating: MockData.rating(featured.id))
                         }.buttonStyle(.plain)
                     }
 
-                    SectionHeader(title: "本周必读", showAll: true)
+                    SectionHeader(title: "本周必读", showAll: true, allBooks: weekly)
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(alignment: .top, spacing: 14) {
                             ForEach(weekly) { b in
@@ -52,19 +52,36 @@ struct HomeView: View {
     }
 }
 
-/// 顶部"搜索栏"占位（原型不做真实搜索）
-struct SearchBarStub: View {
+/// 顶部栏：可点的搜索入口 + 通知铃（带未读红点）
+struct HomeTopBar: View {
     let title: String
+    let unread: Int
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.sub)
-            Text(title).font(Theme.serif(16, .semibold)).foregroundStyle(Theme.ink)
-            Spacer()
-            Image(systemName: "bell").foregroundStyle(Theme.sub)
+            NavigationLink { SearchView() } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(Theme.sub)
+                    Text(title).font(Theme.serif(16, .semibold)).foregroundStyle(Theme.ink)
+                    Spacer()
+                }
+                .padding(.horizontal, 16).padding(.vertical, 11)
+                .background(Theme.surface.opacity(0.95))
+                .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
+                .clipShape(Capsule())
+            }.buttonStyle(.plain)
+
+            NavigationLink { NotificationsView() } label: {
+                Image(systemName: "bell").foregroundStyle(Theme.sub)
+                    .padding(11)
+                    .background(Theme.surface.opacity(0.95))
+                    .overlay(Circle().stroke(Theme.line, lineWidth: 1))
+                    .clipShape(Circle())
+                    .overlay(alignment: .topTrailing) {
+                        if unread > 0 {
+                            Circle().fill(Theme.terraDeep).frame(width: 9, height: 9).offset(x: -2, y: 2)
+                        }
+                    }
+            }.buttonStyle(.plain)
         }
-        .padding(.horizontal, 16).padding(.vertical, 11)
-        .background(Theme.surface.opacity(0.95))
-        .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
-        .clipShape(Capsule())
     }
 }

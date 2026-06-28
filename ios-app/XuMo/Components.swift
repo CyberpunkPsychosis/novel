@@ -25,15 +25,50 @@ struct ScreenBackground: View {
 struct SectionHeader: View {
     let title: String
     var showAll: Bool = false
+    var allBooks: [Book]? = nil      // 提供则「查看全部」可点击进入 AllListView
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: "leaf").font(.caption).foregroundStyle(Theme.olive)
             Text(title).font(Theme.serif(19, .semibold)).foregroundStyle(Theme.ink)
             Spacer()
             if showAll {
-                Text("查看全部 ›").font(.caption).foregroundStyle(Theme.terraDeep)
+                if let allBooks {
+                    NavigationLink { AllListView(title: title, books: allBooks) } label: {
+                        Text("查看全部 ›").font(.caption).foregroundStyle(Theme.terraDeep)
+                    }.buttonStyle(.plain)
+                } else {
+                    Text("查看全部 ›").font(.caption).foregroundStyle(Theme.terraDeep)
+                }
             }
         }
+    }
+}
+
+// MARK: 审核状态徽标
+
+struct ModerationBadge: View {
+    let status: ModerationStatus
+    var body: some View {
+        if status != .approved {
+            Label(status.label, systemImage: status == .pending ? "clock" : "exclamationmark.triangle")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color(hex: status.colorHex))
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Color(hex: status.colorHex).opacity(0.14))
+                .clipShape(Capsule())
+        }
+    }
+}
+
+// MARK: 墨滴胶囊
+
+struct MolDiPill: View {
+    let amount: Int
+    var body: some View {
+        Label("\(amount) 墨滴", systemImage: "drop.fill")
+            .font(.caption.weight(.semibold)).foregroundStyle(Theme.terracotta)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(Theme.terracotta.opacity(0.12)).clipShape(Capsule())
     }
 }
 

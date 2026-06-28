@@ -3,6 +3,8 @@ import SwiftUI
 /// 社区中心：热门话题 + 书友俱乐部 + 最近活动（综合动态流）
 struct CommunityView: View {
     @EnvironmentObject var store: LibraryStore
+    @State private var showCompose = false
+    @State private var postedTopics: [HotTopic] = []
 
     /// 真实改编/续写事件拼到动态流最前
     private var forkEvents: [CommunityEvent] {
@@ -23,12 +25,14 @@ struct CommunityView: View {
                     HStack {
                         SectionHeader(title: "热门话题")
                         Spacer()
-                        Label("发布话题", systemImage: "plus")
-                            .font(.caption.weight(.semibold)).foregroundStyle(Color(hex: "#F4ECDF"))
-                            .padding(.horizontal, 12).padding(.vertical, 6)
-                            .background(Theme.terracotta).clipShape(Capsule())
+                        Button { showCompose = true } label: {
+                            Label("发布话题", systemImage: "plus")
+                                .font(.caption.weight(.semibold)).foregroundStyle(Color(hex: "#F4ECDF"))
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(Theme.terracotta).clipShape(Capsule())
+                        }.buttonStyle(.plain)
                     }
-                    ForEach(MockData.hotTopics) { t in
+                    ForEach(postedTopics + MockData.hotTopics) { t in
                         CategoryBanner(text: t.title, count: t.count, color: Color(hex: t.colorHex))
                     }
 
@@ -52,6 +56,46 @@ struct CommunityView: View {
         }
         .navigationTitle("社区")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showCompose) {
+            CommunityComposeSheet { title in
+                postedTopics.insert(HotTopic(title: title.hasPrefix("#") ? title : "#\(title)",
+                                             count: 1, colorHex: "#A65A3C"), at: 0)
+                store.pushNotification(.system, text: "你发布了话题「\(title)」")
+            }
+        }
+    }
+}
+
+/// 发布话题
+struct CommunityComposeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let onPost: (String) -> Void
+    @State private var text = ""
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.cream.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("说点什么").font(Theme.serif(18, .semibold)).foregroundStyle(Theme.ink)
+                    TextField("例：如果让你改写女主结局…", text: $text, axis: .vertical)
+                        .lineLimit(3...6).padding(12)
+                        .background(Theme.surface)
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Spacer()
+                }
+                .padding(20)
+            }
+            .navigationTitle("发布话题")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("发布") { onPost(text.trimmingCharacters(in: .whitespacesAndNewlines)); dismiss() }
+                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
     }
 }
 
