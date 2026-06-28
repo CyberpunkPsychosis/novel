@@ -27,7 +27,7 @@ npm run db:seed
 npm run dev                     # tsx watch，改代码热重载
 ```
 
-## 接口（里程碑 1）
+## 接口（里程碑 1：账号 + 书库 + 进度）
 | 方法 | 路径 | 鉴权 | 说明 |
 |---|---|---|---|
 | POST | `/auth/apple` | 否 | `{identityToken, penName?}` → `{token, user}` |
@@ -38,6 +38,23 @@ npm run dev                     # tsx watch，改代码热重载
 | POST | `/books` | JWT | 上传原创新作 |
 | GET | `/me/progress` | JWT | `{bookId: chapterIndex}` |
 | PUT | `/me/progress` | JWT | `{bookId, chapterIndex}` |
+
+## 接口（里程碑 2：fork 生态 + 墨滴 + 通知）
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| POST | `/forks` | JWT | `{parentId, mode, fromChapter, newChapterTitle, newContent}` 改编/续写上云 |
+| GET | `/books/:id/permission` | 否 | 该书改编授权（缺省开放/需审批/不收费）|
+| PUT | `/books/:id/permission` | JWT | 作者设授权（开放范围/是否审批/定价）|
+| POST | `/fork-requests` | JWT | `{bookId, fromChapter, mode}` 发起申请 |
+| GET | `/me/fork-requests/incoming` | JWT | 我收到的申请（针对我创作的书）|
+| POST | `/fork-requests/:id/decide` | JWT | `{approve}` 作者同意/拒绝（同意→开权+分成+通知）|
+| POST | `/books/:id/unlock` | JWT | 花墨滴解锁改编/下载权 |
+| GET | `/me/unlocks` | JWT | 我已解锁的书 id 列表 |
+| GET | `/me/credits` | JWT | `{balance, txns, checkin}` |
+| POST | `/me/checkin` | JWT | 每日签到 → `{award, streak}` |
+| POST | `/me/credits/buy` | JWT | `{amount}` mock 买墨滴（里程碑3 换 StoreKit）|
+| GET | `/me/notifications` | JWT | 我的通知 |
+| POST | `/me/notifications/read-all` | JWT | 全标已读 |
 
 ## 部署到国内云（阿里云 ECS / 腾讯云 CVM）
 1. 装 Docker，`git clone` 后 `cd server`，配 `.env`（`JWT_SECRET` 用 `openssl rand -hex 32`）。

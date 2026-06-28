@@ -4,6 +4,9 @@ import { registerAuth } from "./plugins/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { bookRoutes } from "./routes/books.js";
 import { progressRoutes } from "./routes/progress.js";
+import { forkRoutes } from "./routes/forks.js";
+import { creditRoutes } from "./routes/credits.js";
+import { notificationRoutes } from "./routes/notifications.js";
 
 const app = Fastify({
   logger: true,
@@ -18,6 +21,9 @@ app.get("/health", async () => ({ ok: true }));
 await app.register(authRoutes);
 await app.register(bookRoutes);
 await app.register(progressRoutes);
+await app.register(forkRoutes);
+await app.register(creditRoutes);
+await app.register(notificationRoutes);
 
 const port = Number(process.env.PORT || 3000);
 app

@@ -58,3 +58,51 @@ export function serializeUser(u: UserRow) {
     avatarColorHex: u.avatarColorHex,
   };
 }
+
+// MARK: fork 生态实体 → iOS 类型（注意键名：date / bookID / requester=笔名）
+
+export function serializeCreditTxn(t: {
+  id: string; delta: number; reason: string; note: string; createdAt: Date;
+}) {
+  return { id: t.id, delta: t.delta, reason: t.reason, note: t.note, date: t.createdAt };
+}
+
+export function serializeNotification(n: {
+  id: string; type: string; actor: string; text: string; read: boolean; createdAt: Date;
+}) {
+  return { id: n.id, type: n.type, actor: n.actor, text: n.text, read: n.read, date: n.createdAt };
+}
+
+// iOS ForkRequest.requester 是笔名字符串、bookID 大写。
+export function serializeForkRequest(r: {
+  id: string; bookId: string; fromChapter: number; mode: string; status: string; createdAt: Date;
+  requester?: { penName: string } | null;
+}) {
+  return {
+    id: r.id,
+    requester: r.requester?.penName ?? "",
+    bookID: r.bookId,
+    fromChapter: r.fromChapter,
+    mode: r.mode,
+    status: r.status,
+    date: r.createdAt,
+  };
+}
+
+// iOS ForkPermission 是无 id 的 struct；缺省给开放默认。
+export function serializePermission(p: {
+  allowContinue: boolean; allowAdapt: boolean; requireApproval: boolean;
+  allowDownload: boolean; priceMolDi: number;
+} | null) {
+  return {
+    allowContinue: p?.allowContinue ?? true,
+    allowAdapt: p?.allowAdapt ?? true,
+    requireApproval: p?.requireApproval ?? true,
+    allowDownload: p?.allowDownload ?? true,
+    priceMolDi: p?.priceMolDi ?? 0,
+  };
+}
+
+export function serializeCheckin(c: { lastDate: string; streak: number } | null) {
+  return { lastDate: c?.lastDate ?? "", streak: c?.streak ?? 0 };
+}

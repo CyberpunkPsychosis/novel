@@ -2,6 +2,13 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { verifyAppleIdentityToken } from "../auth/apple.js";
 import { serializeUser } from "../serialize.js";
+import { addCredits, notify } from "../platform.js";
+
+// 新用户落地：注册送墨滴 + 欢迎通知（服务端发，跨设备一致）。
+async function welcomeNewUser(userId: string) {
+  await addCredits(userId, 100, "signup", "欢迎加入书艺之阁");
+  await notify(userId, "system", "欢迎来到书艺之阁，记得每天来签到领墨滴。");
+}
 
 // 生成一个不冲突的 handle。
 async function uniqueHandle(base: string): Promise<string> {
@@ -37,6 +44,7 @@ export async function authRoutes(app: FastifyInstance) {
       user = await prisma.user.create({
         data: { appleSub: id.sub, email: id.email ?? null, handle, penName },
       });
+      await welcomeNewUser(user.id);
     }
 
     const token = app.signToken(user.id);
@@ -58,6 +66,7 @@ export async function authRoutes(app: FastifyInstance) {
       const penName = (body.penName || "").trim() || email.split("@")[0];
       const handle = await uniqueHandle(body.penName || email.split("@")[0]);
       user = await prisma.user.create({ data: { email, handle, penName } });
+      await welcomeNewUser(user.id);
     }
 
     const token = app.signToken(user.id);

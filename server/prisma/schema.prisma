@@ -20,8 +20,13 @@ model User {
   avatarColorHex String   @default("#A65A3C")
   createdAt      DateTime @default(now())
 
-  books    Book[]            @relation("OwnedBooks")
-  progress ReadingProgress[]
+  books        Book[]            @relation("OwnedBooks")
+  progress     ReadingProgress[]
+  creditTxns   CreditTxn[]
+  checkin      DailyCheckin?
+  notifications Notification[]
+  forkRequests ForkRequest[]     @relation("Requester")
+  forkUnlocks  ForkUnlock[]
 }
 
 model Book {
@@ -41,7 +46,10 @@ model Book {
   owner           User?    @relation("OwnedBooks", fields: [ownerId], references: [id])
   createdAt       DateTime @default(now())
 
-  chapters Chapter[]
+  chapters     Chapter[]
+  permission   ForkPermission?
+  forkRequests ForkRequest[]
+  unlocks      ForkUnlock[]
 }
 
 model Chapter {
@@ -63,4 +71,72 @@ model ReadingProgress {
   chapterIndex Int
 
   @@unique([userId, bookId])
+}
+
+// MARK: fork 生态（里程碑2）
+
+// 每本书一份改编授权设置（作者设定；缺省视为开放、需审批、不收费）。
+model ForkPermission {
+  bookId          String   @id
+  book            Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  allowContinue   Boolean  @default(true)
+  allowAdapt      Boolean  @default(true)
+  requireApproval Boolean  @default(true)
+  allowDownload   Boolean  @default(true)
+  priceMolDi      Int      @default(0)
+}
+
+// 改编/续写申请。
+model ForkRequest {
+  id          String   @id @default(cuid())
+  requesterId String
+  requester   User     @relation("Requester", fields: [requesterId], references: [id], onDelete: Cascade)
+  bookId      String
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  fromChapter Int
+  mode        String   // "续写" / "改编"
+  status      String   @default("pending") // pending / approved / denied
+  createdAt   DateTime @default(now())
+}
+
+// 已解锁某本书改编/下载权的用户（付费或免费解锁后落账）。
+model ForkUnlock {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId String
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+}
+
+// 墨滴流水。余额 = 该用户所有 delta 之和。
+model CreditTxn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta     Int
+  reason    String   // signup/checkin/buy/unlock/fork/royalty/refund
+  note      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+// 每日签到状态（每用户一条）。
+model DailyCheckin {
+  userId   String @id
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastDate String @default("") // yyyy-MM-dd
+  streak   Int    @default(0)
+}
+
+// 通知。
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // forkRequest/forkApproved/forkDenied/newBranch/checkin/system
+  actor     String   @default("")
+  text      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

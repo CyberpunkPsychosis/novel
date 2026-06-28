@@ -96,6 +96,16 @@ async function main() {
     console.log(`  ✓ 《${b.title}》${b.chapters.length} 章`);
   }
 
+  // 演示：给《法眼》设「花 30 墨滴免审批直接解锁改编」的授权，跑通付费 fork 路径。
+  if (books.some((b) => b.id === "fayan")) {
+    await prisma.forkPermission.upsert({
+      where: { bookId: "fayan" },
+      update: { allowContinue: true, allowAdapt: true, requireApproval: false, allowDownload: true, priceMolDi: 30 },
+      create: { bookId: "fayan", allowContinue: true, allowAdapt: true, requireApproval: false, allowDownload: true, priceMolDi: 30 },
+    });
+    console.log("  ✓ 《法眼》授权：30 墨滴免审批解锁");
+  }
+
   const total = await prisma.chapter.count();
   console.log(`完成：${books.length} 本书，共 ${total} 章。`);
 }
