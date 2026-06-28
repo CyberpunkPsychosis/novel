@@ -16,10 +16,17 @@ type BookRow = {
   forkOf: string | null;
   forkFromChapter: number | null;
   isUserCreated: boolean;
+  moderationStatus?: string;
   chapters?: ChapterRow[];
+  ratings?: { value: number }[];
 };
 
 export function serializeBook(b: BookRow) {
+  const ratings = b.ratings ?? [];
+  const ratingCount = ratings.length;
+  const ratingAvg = ratingCount
+    ? ratings.reduce((s, r) => s + r.value, 0) / ratingCount
+    : 0;
   return {
     id: b.id,
     title: b.title,
@@ -33,6 +40,9 @@ export function serializeBook(b: BookRow) {
     forkOf: b.forkOf,
     forkFromChapter: b.forkFromChapter,
     isUserCreated: b.isUserCreated,
+    moderationStatus: b.moderationStatus ?? "approved",
+    ratingAvg: Math.round(ratingAvg * 10) / 10,
+    ratingCount,
     chapters: (b.chapters ?? [])
       .slice()
       .sort((a, c) => a.index - c.index)

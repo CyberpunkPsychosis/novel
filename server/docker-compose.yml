@@ -31,6 +31,7 @@ services:
       JWT_SECRET: "${JWT_SECRET:-dev-only-change-me-please}"
       APPLE_BUNDLE_ID: "${APPLE_BUNDLE_ID:-com.example.xumo}"
       DEV_EMAIL_LOGIN: "${DEV_EMAIL_LOGIN:-true}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       PORT: "3000"
     ports:
       - "3000:3000"

@@ -7,6 +7,7 @@ import { progressRoutes } from "./routes/progress.js";
 import { forkRoutes } from "./routes/forks.js";
 import { creditRoutes } from "./routes/credits.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { discoverRoutes } from "./routes/discover.js";
 
 const app = Fastify({
   logger: true,
@@ -24,6 +25,7 @@ await app.register(progressRoutes);
 await app.register(forkRoutes);
 await app.register(creditRoutes);
 await app.register(notificationRoutes);
+await app.register(discoverRoutes);
 
 const port = Number(process.env.PORT || 3000);
 app

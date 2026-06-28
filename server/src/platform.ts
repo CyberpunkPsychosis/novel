@@ -1,4 +1,5 @@
 import { prisma } from "./db.js";
+import { moderate } from "./moderation.js";
 
 // 墨滴余额 = 该用户所有流水 delta 之和。
 export async function balanceOf(userId: string): Promise<number> {
@@ -32,6 +33,30 @@ export async function notify(
 // yyyy-MM-dd（UTC，避免时区漂移；签到颗粒度按天足够）。
 export function dayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+// 异步审核一本书：跑 DeepSeek/兜底 → 写回状态 → 通知作者。
+export async function runModeration(bookId: string) {
+  const book = await prisma.book.findUnique({
+    where: { id: bookId }, include: { chapters: true },
+  });
+  if (!book) return;
+  const body = book.chapters
+    .map((c) => `${c.title}\n${c.content}`).join("\n").slice(0, 6000);
+  const res = await moderate(`${book.title} ${book.blurb}`, body);
+  await prisma.book.update({
+    where: { id: bookId },
+    data: {
+      moderationStatus: res.approved ? "approved" : "rejected",
+      moderationReason: res.reason,
+    },
+  });
+  if (book.ownerId) {
+    await notify(book.ownerId, "system",
+      res.approved
+        ? `《${book.title}》已通过审核，现已发布`
+        : `《${book.title}》未通过审核：${res.reason}`);
+  }
 }
 
 // 是否有改编权：作者本人 / 已解锁 / 该书授权为「免审批」。

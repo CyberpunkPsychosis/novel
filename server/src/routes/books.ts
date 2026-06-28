@@ -1,12 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { serializeBook } from "../serialize.js";
+import { runModeration } from "../platform.js";
 
 export async function bookRoutes(app: FastifyInstance) {
-  // GET /books -> [Book]（含 chapters；本期 4 本全量返回，分页后期再说）
+  // GET /books -> [Book]（含 chapters + 评分聚合；本期 4 本全量返回，分页后期再说）
   app.get("/books", async () => {
     const books = await prisma.book.findMany({
-      include: { chapters: true },
+      include: { chapters: true, ratings: true },
       orderBy: { createdAt: "asc" },
     });
     return books.map(serializeBook);
@@ -16,7 +17,7 @@ export async function bookRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>("/books/:id", async (req, reply) => {
     const book = await prisma.book.findUnique({
       where: { id: req.params.id },
-      include: { chapters: true },
+      include: { chapters: true, ratings: true },
     });
     if (!book) return reply.code(404).send({ error: "书不存在" });
     return serializeBook(book);
@@ -57,6 +58,7 @@ export async function bookRoutes(app: FastifyInstance) {
           status: "创作中",
           isUserCreated: true,
           ownerId: me.id,
+          moderationStatus: "pending",
           chapters: {
             create: chapters.map((c) => ({
               index: c.index,
@@ -65,8 +67,10 @@ export async function bookRoutes(app: FastifyInstance) {
             })),
           },
         },
-        include: { chapters: true },
+        include: { chapters: true, ratings: true },
       });
+      // 异步审核（不阻塞返回）：完成后写回状态并通知作者。
+      runModeration(book.id).catch((e) => app.log.error(e));
       return serializeBook(book);
     }
   );

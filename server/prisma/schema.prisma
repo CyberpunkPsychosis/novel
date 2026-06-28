@@ -27,6 +27,8 @@ model User {
   notifications Notification[]
   forkRequests ForkRequest[]     @relation("Requester")
   forkUnlocks  ForkUnlock[]
+  ratings      Rating[]
+  purchases    Purchase[]
 }
 
 model Book {
@@ -42,14 +44,17 @@ model Book {
   forkOf          String? // 父书 id（里程碑2 才真正产生 fork）
   forkFromChapter Int?
   isUserCreated   Boolean  @default(false)
-  ownerId         String?
-  owner           User?    @relation("OwnedBooks", fields: [ownerId], references: [id])
-  createdAt       DateTime @default(now())
+  ownerId          String?
+  owner            User?    @relation("OwnedBooks", fields: [ownerId], references: [id])
+  moderationStatus String   @default("approved") // pending / approved / rejected
+  moderationReason String   @default("")
+  createdAt        DateTime @default(now())
 
   chapters     Chapter[]
   permission   ForkPermission?
   forkRequests ForkRequest[]
   unlocks      ForkUnlock[]
+  ratings      Rating[]
 }
 
 model Chapter {
@@ -139,4 +144,30 @@ model Notification {
   text      String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+// MARK: 评分 / 充值（里程碑3）
+
+// 用户对书评分（1..5），每用户每书一条。
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId    String
+  book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  value     Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bookId])
+}
+
+// StoreKit 充值记录；transactionId 唯一，保证同一笔交易只入账一次。
+model Purchase {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactionId String   @unique
+  productId     String
+  credits       Int
+  createdAt     DateTime @default(now())
 }

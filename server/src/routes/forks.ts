@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
 import { serializeBook, serializeForkRequest, serializePermission } from "../serialize.js";
-import { addCredits, hasForkAccess, notify, spendCredits } from "../platform.js";
+import { addCredits, hasForkAccess, notify, runModeration, spendCredits } from "../platform.js";
 
 export async function forkRoutes(app: FastifyInstance) {
   // POST /forks  改编/续写真上云
@@ -56,6 +56,7 @@ export async function forkRoutes(app: FastifyInstance) {
         forkFromChapter: b.mode === "adaptation" ? fromChapter : null,
         isUserCreated: true,
         ownerId: me.id,
+        moderationStatus: "pending",
         chapters: {
           create: [
             ...base.map((c) => ({ index: c.index, title: c.title, content: c.content })),
@@ -63,7 +64,7 @@ export async function forkRoutes(app: FastifyInstance) {
           ],
         },
       },
-      include: { chapters: true },
+      include: { chapters: true, ratings: true },
     });
 
     // 通知原作者「有人开了支线」
@@ -71,6 +72,8 @@ export async function forkRoutes(app: FastifyInstance) {
       await notify(parent.ownerId, "newBranch",
         `${me.penName} 为《${parent.title}》开了新支线「${title}」`, me.penName);
     }
+    // 异步审核新支线
+    runModeration(child.id).catch((e) => app.log.error(e));
     return serializeBook(child);
   });
 
@@ -183,6 +186,11 @@ export async function forkRoutes(app: FastifyInstance) {
       if (price > 0) {
         const ok = await spendCredits(req.userId!, price, "fork", `解锁《${book.title}》改编权`);
         if (!ok) return reply.code(402).send({ error: "墨滴不足" });
+        // 真实分成：价款进作者账户 + 通知作者。
+        if (book.ownerId && book.ownerId !== req.userId) {
+          await addCredits(book.ownerId, price, "royalty", `《${book.title}》被解锁分成`);
+          await notify(book.ownerId, "system", `有人花 ${price} 墨滴解锁了《${book.title}》，已入账`);
+        }
       }
       await prisma.forkUnlock.upsert({
         where: { userId_bookId: { userId: req.userId!, bookId: book.id } },
