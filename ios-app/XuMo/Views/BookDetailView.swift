@@ -2,9 +2,13 @@ import SwiftUI
 
 struct BookDetailView: View {
     @EnvironmentObject var store: LibraryStore
+    @Environment(\.dismiss) private var dismiss
     let book: Book
     @State private var showFork = false
     @State private var showPermissions = false
+    @State private var showEdit = false
+    @State private var showAppend = false
+    @State private var showDeleteConfirm = false
     @State private var toast: String?
 
     private var parent: Book? { book.forkOf.flatMap { store.book(id: $0) } }
@@ -136,6 +140,15 @@ struct BookDetailView: View {
         .navigationTitle(book.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if isOwner {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { showEdit = true } label: { Label("编辑作品", systemImage: "pencil") }
+                        Button { showAppend = true } label: { Label("追加章节", systemImage: "plus.square") }
+                        Button(role: .destructive) { showDeleteConfirm = true } label: { Label("删除作品", systemImage: "trash") }
+                    } label: { Image(systemName: "ellipsis.circle") }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { store.setShelf(book.id, status: "want"); toast = "已加入「想读」" } label: {
@@ -165,6 +178,16 @@ struct BookDetailView: View {
         .sheet(isPresented: $showPermissions) {
             PermissionEditor(book: book).environmentObject(store)
         }
+        .sheet(isPresented: $showEdit) { EditBookView(book: book).environmentObject(store) }
+        .sheet(isPresented: $showAppend) { AppendChapterView(book: book).environmentObject(store) }
+        .confirmationDialog("删除作品", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("删除《\(book.title)》", role: .destructive) {
+                Task { @MainActor in
+                    if await store.deleteBook(book.id) { dismiss() }
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: { Text("删除后不可恢复，连同章节/评分/书评一并移除。") }
         .bookDestination(store)
         .task { await store.loadPermission(book.id) }
     }
@@ -240,9 +263,13 @@ struct RatingRow: View {
                             Image(systemName: i <= mine ? "star.fill" : "star")
                                 .font(.system(size: 16))
                                 .foregroundStyle(i <= mine ? Theme.bronze : Theme.line)
-                                .onTapGesture { store.rate(book.id, value: i) }
+                                .onTapGesture {
+                                    if i == mine { store.unrate(book.id) }   // 再点同一星=取消
+                                    else { store.rate(book.id, value: i) }
+                                }
                         }
                     }
+                    if mine > 0 { Text("再点同一颗星取消评分").font(.system(size: 9)).foregroundStyle(Theme.sub) }
                 }
             }
             // 评分分布（5★→1★）

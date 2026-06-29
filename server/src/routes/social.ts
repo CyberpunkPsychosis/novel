@@ -106,6 +106,26 @@ export async function socialRoutes(app: FastifyInstance) {
                avatarUrl: r.user.avatarUrl ?? null, text: r.text, date: r.createdAt };
     });
 
+  // DELETE /topics/:id （删自己的话题，级联回帖）
+  app.delete<{ Params: { id: string } }>(
+    "/topics/:id", { preHandler: [app.authenticate] }, async (req, reply) => {
+      const t = await prisma.topic.findUnique({ where: { id: req.params.id } });
+      if (!t) return reply.code(404).send({ error: "话题不存在" });
+      if (t.userId !== req.userId) return reply.code(403).send({ error: "只能删自己的话题" });
+      await prisma.topic.delete({ where: { id: t.id } });
+      return { ok: true };
+    });
+
+  // DELETE /topic-replies/:id （删自己的回帖）
+  app.delete<{ Params: { id: string } }>(
+    "/topic-replies/:id", { preHandler: [app.authenticate] }, async (req, reply) => {
+      const r = await prisma.topicReply.findUnique({ where: { id: req.params.id } });
+      if (!r) return reply.code(404).send({ error: "回帖不存在" });
+      if (r.userId !== req.userId) return reply.code(403).send({ error: "只能删自己的回帖" });
+      await prisma.topicReply.delete({ where: { id: r.id } });
+      return { ok: true };
+    });
+
   // ===== 俱乐部 =====
   app.get("/clubs", async (req) => {
     const me = await uid(req);
@@ -121,6 +141,28 @@ export async function socialRoutes(app: FastifyInstance) {
     }));
   });
 
+  // POST /clubs { name, intro } -> 用户自建俱乐部（建者自动入会）
+  app.post("/clubs", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const b = (req.body ?? {}) as { name?: string; intro?: string };
+    const name = (b.name ?? "").trim();
+    if (!name) return reply.code(400).send({ error: "俱乐部名不能为空" });
+    const club = await prisma.club.create({
+      data: { name, intro: (b.intro ?? "").trim(), ownerId: req.userId! },
+    });
+    await prisma.clubMember.create({ data: { userId: req.userId!, clubId: club.id } });
+    return { id: club.id, name: club.name, intro: club.intro, memberCount: 1, joinedByMe: true };
+  });
+
+  // DELETE /clubs/:id -> 解散（仅建者）
+  app.delete<{ Params: { id: string } }>(
+    "/clubs/:id", { preHandler: [app.authenticate] }, async (req, reply) => {
+      const club = await prisma.club.findUnique({ where: { id: req.params.id } });
+      if (!club) return reply.code(404).send({ error: "俱乐部不存在" });
+      if (club.ownerId !== req.userId) return reply.code(403).send({ error: "只有建者能解散" });
+      await prisma.club.delete({ where: { id: club.id } });
+      return { ok: true };
+    });
+
   // GET /clubs/:id -> 详情（信息 + 成员 + 我是否加入）
   app.get<{ Params: { id: string } }>("/clubs/:id", async (req, reply) => {
     const me = await uid(req);
@@ -133,6 +175,7 @@ export async function socialRoutes(app: FastifyInstance) {
       id: c.id, name: c.name, intro: c.intro,
       memberCount: c.members.length,
       joinedByMe: me ? c.members.some((m) => m.userId === me) : false,
+      isOwner: !!me && c.ownerId === me,
       members: c.members.map((m) => ({
         penName: m.user.penName, avatarColorHex: m.user.avatarColorHex, avatarUrl: m.user.avatarUrl ?? null,
       })),

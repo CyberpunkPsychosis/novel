@@ -30,6 +30,13 @@ struct ForkRequestsInboxView: View {
                     } else {
                         ForEach(outgoing) { req in
                             OutgoingRow(req: req, bookTitle: store.book(id: req.bookID)?.title ?? "")
+                                .contextMenu {
+                                    if req.status == .pending {
+                                        Button(role: .destructive) {
+                                            Task { await store.withdrawRequest(req.id) }
+                                        } label: { Label("撤回申请", systemImage: "arrow.uturn.backward") }
+                                    }
+                                }
                         }
                     }
                 }

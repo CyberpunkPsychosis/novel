@@ -78,6 +78,16 @@ export async function communityRoutes(app: FastifyInstance) {
       return { liked, likeCount };
     });
 
+  // DELETE /reviews/:id （删自己的书评）
+  app.delete<{ Params: { id: string } }>(
+    "/reviews/:id", { preHandler: [app.authenticate] }, async (req, reply) => {
+      const r = await prisma.review.findUnique({ where: { id: req.params.id } });
+      if (!r) return reply.code(404).send({ error: "书评不存在" });
+      if (r.userId !== req.userId) return reply.code(403).send({ error: "只能删自己的书评" });
+      await prisma.review.delete({ where: { id: r.id } });
+      return { ok: true };
+    });
+
   // GET /feed -> [{who, avatarColorHex, avatarUrl, text, meta, bookId}]  全站近期动态
   app.get("/feed", async () => {
     const rows = await prisma.activity.findMany({

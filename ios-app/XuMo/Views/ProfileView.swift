@@ -181,6 +181,11 @@ struct MyReviewsList: View {
                                 .padding(12)
                                 .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surface))
                             }.buttonStyle(.plain)
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    Task { await store.deleteReview(r.id); reviews = await store.myReviews() }
+                                } label: { Label("删除书评", systemImage: "trash") }
+                            }
                         }
                     }
                 }.padding(20)
@@ -281,6 +286,11 @@ struct MyCreationsList: View {
                     } else {
                         ForEach(store.myCreations) { b in
                             NavigationLink(value: b.id) { CreationRow(book: b) }.buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        Task { await store.deleteBook(b.id) }
+                                    } label: { Label("删除作品", systemImage: "trash") }
+                                }
                         }
                     }
                 }.padding(20)

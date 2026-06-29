@@ -231,6 +231,7 @@ struct ClubDetail: Codable, Hashable {
     var intro: String
     var memberCount: Int
     var joinedByMe: Bool
+    var isOwner: Bool = false
     var members: [ClubMemberItem]
 }
 struct JoinResult: Codable { var joined: Bool; var memberCount: Int }

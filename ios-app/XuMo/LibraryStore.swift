@@ -158,10 +158,6 @@ final class LibraryStore: ObservableObject {
         return new
     }
 
-    func deleteUserBook(id: String) {
-        var mine = loadUserBooks(); mine.removeAll { $0.id == id }; saveUserBooks(mine); reload()
-    }
-
     /// 上传一部原创新作（非 fork）。作者用外部 AI/手写完成后粘进来。
     @discardableResult
     func createOriginal(title: String, blurb: String, tags: [String],
@@ -630,6 +626,75 @@ extension LibraryStore {
     func postClubTopic(_ clubID: String, title: String, body: String) async -> Bool {
         let payload = try? JSONEncoder().encode(["title": title, "body": body])
         return (try? await APIClient.shared.request("/clubs/\(clubID)/topics", method: "POST", bodyData: payload, auth: true) as TopicItem) != nil
+    }
+
+    // MARK: 增删改（P2）
+    @MainActor
+    func updateBook(_ id: String, title: String, blurb: String, tags: [String],
+                    coverColors: [String], coverAccent: String) async {
+        struct P: Encodable { let title: String; let blurb: String; let tags: [String]; let coverColors: [String]; let coverAccent: String }
+        let body = try? JSONEncoder().encode(P(title: title, blurb: blurb, tags: tags, coverColors: coverColors, coverAccent: coverAccent))
+        _ = try? await APIClient.shared.request("/books/\(id)", method: "PUT", bodyData: body, auth: true) as Book
+        await refreshBooks()
+    }
+
+    @MainActor
+    @discardableResult
+    func deleteBook(_ id: String) async -> Bool {
+        let ok = (try? await APIClient.shared.request("/books/\(id)", method: "DELETE", auth: true) as OKResponse) != nil
+        if ok {
+            var mine = loadUserBooks(); mine.removeAll { $0.id == id }; saveUserBooks(mine)
+            await refreshBooks()
+        }
+        return ok
+    }
+
+    @MainActor
+    func appendChapter(_ bookID: String, title: String, content: String) async {
+        let body = try? JSONEncoder().encode(["title": title, "content": content])
+        _ = try? await APIClient.shared.request("/books/\(bookID)/chapters", method: "POST", bodyData: body, auth: true) as Book
+        await refreshBooks()
+    }
+
+    @discardableResult
+    func createClub(name: String, intro: String) async -> Bool {
+        let body = try? JSONEncoder().encode(["name": name, "intro": intro])
+        let ok = (try? await APIClient.shared.request("/clubs", method: "POST", bodyData: body, auth: true) as ClubItem) != nil
+        if ok { await loadClubs() }
+        return ok
+    }
+
+    @discardableResult
+    func deleteClub(_ id: String) async -> Bool {
+        let ok = (try? await APIClient.shared.request("/clubs/\(id)", method: "DELETE", auth: true) as OKResponse) != nil
+        if ok { await loadClubs() }
+        return ok
+    }
+
+    func deleteTopic(_ id: String) async {
+        _ = try? await APIClient.shared.request("/topics/\(id)", method: "DELETE", auth: true) as OKResponse
+        await loadTopics()
+    }
+    func deleteReply(_ id: String) async {
+        _ = try? await APIClient.shared.request("/topic-replies/\(id)", method: "DELETE", auth: true) as OKResponse
+    }
+    func deleteReview(_ id: String) async {
+        _ = try? await APIClient.shared.request("/reviews/\(id)", method: "DELETE", auth: true) as OKResponse
+    }
+
+    func withdrawRequest(_ id: String) async {
+        _ = try? await APIClient.shared.request("/fork-requests/\(id)", method: "DELETE", auth: true) as OKResponse
+        await loadOutgoingRequests()
+    }
+
+    /// 取消评分
+    func unrate(_ bookID: String) {
+        myRatings[bookID] = nil   // 乐观
+        Task {
+            if let r = try? await APIClient.shared.request("/books/\(bookID)/rating", method: "DELETE", auth: true) as RatingResponse {
+                await MainActor.run { applyRating(bookID, avg: r.ratingAvg, count: r.ratingCount) }
+            }
+        }
     }
 
     // MARK: 话题

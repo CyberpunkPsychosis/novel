@@ -144,6 +144,17 @@ export async function forkRoutes(app: FastifyInstance) {
     return rows.map(serializeForkRequest);
   });
 
+  // DELETE /fork-requests/:id  撤回我发出的待审申请
+  app.delete<{ Params: { id: string } }>(
+    "/fork-requests/:id", { preHandler: [app.authenticate] }, async (req, reply) => {
+      const r = await prisma.forkRequest.findUnique({ where: { id: req.params.id } });
+      if (!r) return reply.code(404).send({ error: "申请不存在" });
+      if (r.requesterId !== req.userId) return reply.code(403).send({ error: "只能撤回自己的申请" });
+      if (r.status !== "pending") return reply.code(400).send({ error: "已审批的申请不能撤回" });
+      await prisma.forkRequest.delete({ where: { id: r.id } });
+      return { ok: true };
+    });
+
   // GET /me/fork-requests/outgoing  我发出的申请
   app.get("/me/fork-requests/outgoing", { preHandler: [app.authenticate] }, async (req) => {
     const rows = await prisma.forkRequest.findMany({

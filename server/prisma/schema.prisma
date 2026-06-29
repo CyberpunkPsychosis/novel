@@ -56,6 +56,7 @@ model Book {
   owner            User?    @relation("OwnedBooks", fields: [ownerId], references: [id])
   moderationStatus String   @default("approved") // pending / approved / rejected
   moderationReason String   @default("")
+  featured         Boolean  @default(false) // 运营精选
   createdAt        DateTime @default(now())
 
   chapters     Chapter[]
@@ -153,6 +154,8 @@ model Notification {
   actor     String   @default("")
   text      String
   read      Boolean  @default(false)
+  targetKind String? // book / forkRequest / topic —— 点击跳转用
+  targetId   String?
   createdAt DateTime @default(now())
 }
 
@@ -261,6 +264,7 @@ model Club {
   id        String       @id @default(cuid())
   name      String
   intro     String       @default("")
+  ownerId   String? // 建者（用户自建的俱乐部）；seed 俱乐部为空
   createdAt DateTime     @default(now())
   members   ClubMember[]
 }

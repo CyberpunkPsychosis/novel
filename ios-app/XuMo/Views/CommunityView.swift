@@ -4,6 +4,7 @@ import SwiftUI
 struct CommunityView: View {
     @EnvironmentObject var store: LibraryStore
     @State private var showCompose = false
+    @State private var showCreateClub = false
     private let topicColors = ["#6E7042", "#B17D6B", "#A65A3C", "#7C4A38", "#1A2332"]
 
     /// 全站活动流（服务器真数据）；未拉到时退回演示数据。
@@ -35,10 +36,26 @@ struct CommunityView: View {
                                 CategoryBanner(text: t.title, count: t.replyCount,
                                                color: Color(hex: topicColors[i % topicColors.count]))
                             }.buttonStyle(.plain)
+                            .contextMenu {
+                                if t.author == store.currentUser?.penName {
+                                    Button(role: .destructive) {
+                                        Task { await store.deleteTopic(t.id) }
+                                    } label: { Label("删除话题", systemImage: "trash") }
+                                }
+                            }
                         }
                     }
 
-                    SectionHeader(title: "书友俱乐部")
+                    HStack {
+                        SectionHeader(title: "书友俱乐部")
+                        Spacer()
+                        Button { showCreateClub = true } label: {
+                            Label("创建", systemImage: "plus").font(.caption.weight(.semibold))
+                                .foregroundStyle(Color(hex: "#F4ECDF"))
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(Theme.olive).clipShape(Capsule())
+                        }.buttonStyle(.plain)
+                    }
                     HStack(spacing: 12) {
                         ForEach(store.clubs) { c in
                             NavigationLink { ClubDetailView(clubID: c.id) } label: { ClubCard(club: c) }
@@ -68,6 +85,7 @@ struct CommunityView: View {
                 Task { await store.postTopic(title: title, body: "") }
             }
         }
+        .sheet(isPresented: $showCreateClub) { CreateClubView().environmentObject(store) }
     }
 }
 
@@ -124,6 +142,7 @@ struct ClubCard: View {
 /// 俱乐部详情：简介 + 加入/退出 + 成员 + 讨论区
 struct ClubDetailView: View {
     @EnvironmentObject var store: LibraryStore
+    @Environment(\.dismiss) private var dismiss
     let clubID: String
     @State private var detail: ClubDetail?
     @State private var topics: [TopicItem] = []
@@ -150,6 +169,15 @@ struct ClubDetailView: View {
                                 .background(d.joinedByMe ? Theme.line.opacity(0.5) : Theme.terraDeep)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                         }.buttonStyle(.plain)
+
+                        if d.isOwner {
+                            Button(role: .destructive) {
+                                Task { @MainActor in if await store.deleteClub(clubID) { dismiss() } }
+                            } label: {
+                                Label("解散俱乐部", systemImage: "trash").font(.caption)
+                                    .foregroundStyle(Theme.terraDeep)
+                            }
+                        }
 
                         SectionHeader(title: "成员 \(d.memberCount)")
                         if d.members.isEmpty {

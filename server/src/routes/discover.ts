@@ -63,6 +63,16 @@ export async function discoverRoutes(app: FastifyInstance) {
       return { ratingAvg: Math.round(avg * 10) / 10, ratingCount: count, mine: value };
     });
 
+  // DELETE /books/:id/rating  取消我的评分 -> { ratingAvg, ratingCount, mine:0 }
+  app.delete<{ Params: { id: string } }>(
+    "/books/:id/rating", { preHandler: [app.authenticate] }, async (req) => {
+      await prisma.rating.deleteMany({ where: { userId: req.userId!, bookId: req.params.id } });
+      const ratings = await prisma.rating.findMany({ where: { bookId: req.params.id } });
+      const count = ratings.length;
+      const avg = count ? ratings.reduce((s, r) => s + r.value, 0) / count : 0;
+      return { ratingAvg: Math.round(avg * 10) / 10, ratingCount: count, mine: 0 };
+    });
+
   // GET /me/ratings -> { bookId: value }  我打过的分
   app.get("/me/ratings", { preHandler: [app.authenticate] }, async (req) => {
     const rows = await prisma.rating.findMany({ where: { userId: req.userId! } });
