@@ -49,6 +49,18 @@ struct BookDetailView: View {
 
                     Text(book.blurb).font(.body).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(4)
 
+                    // 审核未通过：仅作者本人能看到理由
+                    if book.isMine && moderation == .rejected && !book.moderationReason.isEmpty {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.terraDeep)
+                            Text("未通过审核：\(book.moderationReason)")
+                                .font(.caption).foregroundStyle(Theme.terraDeep)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.terraDeep.opacity(0.1)))
+                    }
+
                     RatingRow(book: book)
 
                     HStack(spacing: 12) {

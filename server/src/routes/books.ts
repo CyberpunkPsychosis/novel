@@ -3,24 +3,37 @@ import { prisma } from "../db.js";
 import { serializeBook } from "../serialize.js";
 import { logActivity, runModeration } from "../platform.js";
 
+// 可选取登录用户 id（公开接口也想知道"是不是我"）。
+async function optUid(req: any): Promise<string | null> {
+  try { return ((await req.jwtVerify()) as { uid: string }).uid; } catch { return null; }
+}
+
 export async function bookRoutes(app: FastifyInstance) {
-  // GET /books -> [Book]（含 chapters + 评分聚合；本期 4 本全量返回，分页后期再说）
-  app.get("/books", async () => {
+  // GET /books -> [Book]（只返回已过审的；外加我自己未过审的）
+  app.get("/books", async (req) => {
+    const me = await optUid(req);
     const books = await prisma.book.findMany({
+      where: me
+        ? { OR: [{ moderationStatus: "approved" }, { ownerId: me }] }
+        : { moderationStatus: "approved" },
       include: { chapters: true, ratings: true },
       orderBy: { createdAt: "asc" },
     });
-    return books.map(serializeBook);
+    return books.map((b) => serializeBook(b, me));
   });
 
-  // GET /books/:id -> Book
+  // GET /books/:id -> Book（未过审的仅作者可见）
   app.get<{ Params: { id: string } }>("/books/:id", async (req, reply) => {
+    const me = await optUid(req);
     const book = await prisma.book.findUnique({
       where: { id: req.params.id },
       include: { chapters: true, ratings: true },
     });
     if (!book) return reply.code(404).send({ error: "书不存在" });
-    return serializeBook(book);
+    if (book.moderationStatus !== "approved" && book.ownerId !== me) {
+      return reply.code(404).send({ error: "书不存在" });
+    }
+    return serializeBook(book, me);
   });
 
   // POST /books （上传原创新作）-> Book
@@ -72,7 +85,7 @@ export async function bookRoutes(app: FastifyInstance) {
       await logActivity(me.id, "publish", `发布了新作《${book.title}》`, book.id);
       // 异步审核（不阻塞返回）：完成后写回状态并通知作者。
       runModeration(book.id).catch((e) => app.log.error(e));
-      return serializeBook(book);
+      return serializeBook(book, me.id);
     }
   );
 }

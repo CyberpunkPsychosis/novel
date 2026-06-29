@@ -15,7 +15,7 @@ export async function creditRoutes(app: FastifyInstance) {
   });
 
   // POST /me/checkin { day? } -> { award, streak }（每日一次）
-  // day 由客户端按其本地时区传入（"yyyy-MM-dd"），避免服务器 UTC 与客户端本地"今天"错位。
+  // day 由客户端按其本地时区传入；用条件更新做原子化，防并发双发奖励。
   app.post("/me/checkin", { preHandler: [app.authenticate] }, async (req) => {
     const bodyDay = String((req.body as { day?: string })?.day ?? "");
     const today = /^\d{4}-\d{2}-\d{2}$/.test(bodyDay) ? bodyDay : dayKey(new Date());
@@ -24,22 +24,26 @@ export async function creditRoutes(app: FastifyInstance) {
 
     const yesterday = dayKey(new Date(new Date(`${today}T00:00:00Z`).getTime() - 86400_000));
     const streak = cur?.lastDate === yesterday ? cur.streak + 1 : 1;
-    await prisma.dailyCheckin.upsert({
-      where: { userId: req.userId! },
-      create: { userId: req.userId!, lastDate: today, streak },
-      update: { lastDate: today, streak },
-    });
+
+    if (cur) {
+      // 原子：仅当 lastDate 仍是旧值时才更新成功，避免并发双发。
+      const r = await prisma.dailyCheckin.updateMany({
+        where: { userId: req.userId!, lastDate: cur.lastDate },
+        data: { lastDate: today, streak },
+      });
+      if (r.count === 0) return { award: 0, streak };
+    } else {
+      try {
+        await prisma.dailyCheckin.create({ data: { userId: req.userId!, lastDate: today, streak } });
+      } catch {
+        return { award: 0, streak: 1 }; // 并发下另一个请求已创建
+      }
+    }
     const award = 10 + Math.min(streak, 7) * 2;
     await addCredits(req.userId!, award, "checkin", `连续签到 ${streak} 天`);
     await notify(req.userId!, "checkin", `签到成功 +${award} 墨滴（连续 ${streak} 天）`);
     return { award, streak };
   });
 
-  // POST /me/credits/buy { amount } -> { balance }（里程碑3 换 StoreKit）
-  app.post("/me/credits/buy", { preHandler: [app.authenticate] }, async (req, reply) => {
-    const amount = Number((req.body as { amount?: number })?.amount ?? 0);
-    if (amount <= 0) return reply.code(400).send({ error: "金额非法" });
-    await addCredits(req.userId!, amount, "buy", `购买 ${amount} 墨滴`);
-    return { balance: await balanceOf(req.userId!) };
-  });
+  // 注：原 POST /me/credits/buy（无校验直接发币）已删除，仅保留 StoreKit 的 /me/credits/purchase。
 }

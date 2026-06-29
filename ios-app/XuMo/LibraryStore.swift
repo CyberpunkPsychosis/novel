@@ -365,15 +365,7 @@ extension LibraryStore {
         addCredits(-amount, reason: reason, note: note)
         return true
     }
-    /// 买墨滴（里程碑3 换 StoreKit）：乐观加 + 上云 + 回拉对账。
-    func buyMolDi(_ amount: Int) {
-        addCredits(amount, reason: .buy, note: "购买 \(amount) 墨滴")
-        Task {
-            let body = try? JSONEncoder().encode(BuyPayload(amount: amount))
-            _ = try? await APIClient.shared.request("/me/credits/buy", method: "POST", bodyData: body, auth: true) as BalanceResponse
-            await loadCredits()
-        }
-    }
+    // 买墨滴已统一走 StoreKit（IAPStore + grantPurchase）；旧的 /me/credits/buy 后门已删。
 
     // MARK: 每日签到
     var canCheckinToday: Bool { checkin.lastDate != DayKey.key(Date()) }
@@ -412,10 +404,8 @@ extension LibraryStore {
         Task { _ = try? await APIClient.shared.request("/me/notifications/read-all", method: "POST", auth: true) as OKResponse }
     }
 
-    // MARK: 授权 / 所有权
-    func isOwner(_ book: Book) -> Bool {
-        book.isUserCreated && book.author == currentUser?.penName
-    }
+    // MARK: 授权 / 所有权（以服务器 isMine 为准，不再用笔名比对）
+    func isOwner(_ book: Book) -> Bool { book.isMine }
     func permission(for bookID: String) -> ForkPermission { permissions[bookID] ?? ForkPermission() }
 
     /// 拉某本书的授权进缓存（BookDetailView 出现时调用）。

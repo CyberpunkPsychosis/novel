@@ -135,7 +135,6 @@ struct ForkCreatePayload: Encodable {
 }
 struct ForkRequestPayload: Encodable { let bookId: String; let fromChapter: Int; let mode: String }
 struct DecidePayload: Encodable { let approve: Bool }
-struct BuyPayload: Encodable { let amount: Int }
 
 struct CreditsResponse: Decodable {
     let balance: Int

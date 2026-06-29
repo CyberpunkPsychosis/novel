@@ -11,9 +11,14 @@ const PRODUCTS: Record<string, number> = {
   "com.example.xumo.molzi.1600": 1600,
 };
 
+async function optUid(req: any): Promise<string | null> {
+  try { return ((await req.jwtVerify()) as { uid: string }).uid; } catch { return null; }
+}
+
 export async function discoverRoutes(app: FastifyInstance) {
   // GET /rankings -> [Book]  按综合热度排序（fork数 *3 + 解锁数 *2 + 评分均值 *2 + 评分数）
-  app.get("/rankings", async () => {
+  app.get("/rankings", async (req) => {
+    const me = await optUid(req);
     const books = await prisma.book.findMany({
       where: { moderationStatus: "approved" },
       include: { chapters: true, ratings: true, unlocks: true },
@@ -29,7 +34,7 @@ export async function discoverRoutes(app: FastifyInstance) {
       return { b, hot };
     });
     scored.sort((x, y) => y.hot - x.hot);
-    return scored.map((s) => serializeBook(s.b));
+    return scored.map((s) => serializeBook(s.b, me));
   });
 
   // POST /books/:id/rating { value:1..5 } -> { ratingAvg, ratingCount, mine }

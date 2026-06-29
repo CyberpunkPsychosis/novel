@@ -22,6 +22,9 @@ export async function forkRoutes(app: FastifyInstance) {
       where: { id: b.parentId }, include: { chapters: true },
     });
     if (!parent) return reply.code(404).send({ error: "原作不存在" });
+    if (parent.moderationStatus !== "approved") {
+      return reply.code(403).send({ error: "原作尚未过审，无法改编" });
+    }
 
     if (!(await hasForkAccess(me.id, parent.id))) {
       return reply.code(403).send({ error: "尚无改编权，请先申请或解锁" });
@@ -75,7 +78,7 @@ export async function forkRoutes(app: FastifyInstance) {
     await logActivity(me.id, "fork", `${label}了《${parent.title}》，开出新支线`, child.id);
     // 异步审核新支线
     runModeration(child.id).catch((e) => app.log.error(e));
-    return serializeBook(child);
+    return serializeBook(child, me.id);
   });
 
   // GET /books/:id/permission  （公开：读者据此知道能否改编/价格）
@@ -191,8 +194,13 @@ export async function forkRoutes(app: FastifyInstance) {
     "/books/:id/unlock", { preHandler: [app.authenticate] }, async (req, reply) => {
       const book = await prisma.book.findUnique({ where: { id: req.params.id } });
       if (!book) return reply.code(404).send({ error: "书不存在" });
+      if (book.ownerId === req.userId) return { ok: true }; // 自己的书无需解锁
       const perm = await prisma.forkPermission.findUnique({ where: { bookId: book.id } });
       const price = perm?.priceMolDi ?? 0;
+      // 需审批的书：付费可"付费免审批"解锁；免费(price=0)又需审批的，不能直接解锁，必须申请。
+      if (perm?.requireApproval && price === 0) {
+        return reply.code(403).send({ error: "该作品需作者审批，请提交申请" });
+      }
 
       if (price > 0) {
         const ok = await spendCredits(req.userId!, price, "fork", `解锁《${book.title}》改编权`);

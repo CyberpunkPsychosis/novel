@@ -30,6 +30,10 @@ struct Book: Codable, Identifiable, Hashable {
     var chapters: [Chapter]
     /// 服务器审核状态：approved / pending / rejected（缺省视为 approved）。
     var moderationStatus: String = "approved"
+    /// 审核理由（仅作者本人可见，rejected 时有值）。
+    var moderationReason: String = ""
+    /// 是否当前用户拥有（服务器按 ownerId 判定，替代用笔名比对）。
+    var isMine: Bool = false
     /// 服务器聚合的评分均值与人数。
     var ratingAvg: Double = 0
     var ratingCount: Int = 0
@@ -40,7 +44,8 @@ struct Book: Codable, Identifiable, Hashable {
         case id, title, author, blurb, tags, tagline
         case coverColors, coverAccent, status
         case forkOf, forkFromChapter, isUserCreated, chapters
-        case moderationStatus, ratingAvg, ratingCount, ratingDist
+        case moderationStatus, moderationReason, isMine
+        case ratingAvg, ratingCount, ratingDist
     }
 }
 
@@ -62,6 +67,8 @@ extension Book {
         isUserCreated = (try? c.decode(Bool.self, forKey: .isUserCreated)) ?? false
         chapters = (try? c.decode([Chapter].self, forKey: .chapters)) ?? []
         moderationStatus = (try? c.decode(String.self, forKey: .moderationStatus)) ?? "approved"
+        moderationReason = (try? c.decode(String.self, forKey: .moderationReason)) ?? ""
+        isMine = (try? c.decode(Bool.self, forKey: .isMine)) ?? false
         ratingAvg = (try? c.decode(Double.self, forKey: .ratingAvg)) ?? 0
         ratingCount = (try? c.decode(Int.self, forKey: .ratingCount)) ?? 0
         ratingDist = (try? c.decode([Int].self, forKey: .ratingDist)) ?? []

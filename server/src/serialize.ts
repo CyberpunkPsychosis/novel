@@ -17,11 +17,14 @@ type BookRow = {
   forkFromChapter: number | null;
   isUserCreated: boolean;
   moderationStatus?: string;
+  moderationReason?: string;
+  ownerId?: string | null;
   chapters?: ChapterRow[];
   ratings?: { value: number }[];
 };
 
-export function serializeBook(b: BookRow) {
+// meId：当前请求者 id；用于算 isMine、仅对 owner 下发审核理由。
+export function serializeBook(b: BookRow, meId?: string | null) {
   const ratings = b.ratings ?? [];
   const ratingCount = ratings.length;
   const ratingAvg = ratingCount
@@ -32,6 +35,7 @@ export function serializeBook(b: BookRow) {
   for (const r of ratings) {
     if (r.value >= 1 && r.value <= 5) ratingDist[r.value - 1] += 1;
   }
+  const isMine = !!meId && !!b.ownerId && b.ownerId === meId;
   return {
     id: b.id,
     title: b.title,
@@ -45,7 +49,10 @@ export function serializeBook(b: BookRow) {
     forkOf: b.forkOf,
     forkFromChapter: b.forkFromChapter,
     isUserCreated: b.isUserCreated,
+    isMine,
     moderationStatus: b.moderationStatus ?? "approved",
+    // 审核理由只给作者本人看
+    moderationReason: isMine ? (b.moderationReason ?? "") : "",
     ratingAvg: Math.round(ratingAvg * 10) / 10,
     ratingCount,
     ratingDist,

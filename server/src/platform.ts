@@ -14,14 +14,17 @@ export async function addCredits(userId: string, delta: number, reason: string, 
   await prisma.creditTxn.create({ data: { userId, delta, reason, note } });
 }
 
-// 校验余额后扣费；不足返回 false 不扣。
+// 校验余额后扣费；不足返回 false 不扣。事务内重算余额，防并发扣成负数。
 export async function spendCredits(
   userId: string, amount: number, reason: string, note = ""
 ): Promise<boolean> {
   if (amount <= 0) return true;
-  if ((await balanceOf(userId)) < amount) return false;
-  await addCredits(userId, -amount, reason, note);
-  return true;
+  return prisma.$transaction(async (tx) => {
+    const agg = await tx.creditTxn.aggregate({ where: { userId }, _sum: { delta: true } });
+    if ((agg._sum.delta ?? 0) < amount) return false;
+    await tx.creditTxn.create({ data: { userId, delta: -amount, reason, note } });
+    return true;
+  });
 }
 
 export async function notify(
