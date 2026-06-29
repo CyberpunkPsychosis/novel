@@ -1,5 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 import { registerAuth } from "./plugins/auth.js";
 import { authRoutes } from "./routes/auth.js";
 import { bookRoutes } from "./routes/books.js";
@@ -10,6 +14,7 @@ import { notificationRoutes } from "./routes/notifications.js";
 import { discoverRoutes } from "./routes/discover.js";
 import { communityRoutes } from "./routes/community.js";
 import { socialRoutes } from "./routes/social.js";
+import { mediaRoutes } from "./routes/media.js";
 
 const app = Fastify({
   logger: true,
@@ -17,7 +22,13 @@ const app = Fastify({
 });
 
 await app.register(cors, { origin: true });
+await app.register(multipart, { limits: { fileSize: 3 * 1024 * 1024 } }); // 头像 ≤3MB
 await registerAuth(app);
+
+// 头像静态目录：/uploads/* → ./uploads
+export const uploadsDir = resolve(process.cwd(), "uploads");
+mkdirSync(uploadsDir, { recursive: true });
+await app.register(fastifyStatic, { root: uploadsDir, prefix: "/uploads/" });
 
 app.get("/health", async () => ({ ok: true }));
 
@@ -30,6 +41,7 @@ await app.register(notificationRoutes);
 await app.register(discoverRoutes);
 await app.register(communityRoutes);
 await app.register(socialRoutes);
+await app.register(mediaRoutes);
 
 const port = Number(process.env.PORT || 3000);
 app

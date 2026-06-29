@@ -79,4 +79,15 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user) return reply.code(404).send({ error: "用户不存在" });
     return serializeUser(user);
   });
+
+  // PUT /me { penName?, bio?, avatarColorHex? } -> User
+  app.put("/me", { preHandler: [app.authenticate] }, async (req, reply) => {
+    const b = (req.body ?? {}) as { penName?: string; bio?: string; avatarColorHex?: string };
+    const data: Record<string, string> = {};
+    if (typeof b.penName === "string" && b.penName.trim()) data.penName = b.penName.trim();
+    if (typeof b.bio === "string") data.bio = b.bio.trim();
+    if (typeof b.avatarColorHex === "string" && b.avatarColorHex.trim()) data.avatarColorHex = b.avatarColorHex.trim();
+    const user = await prisma.user.update({ where: { id: req.userId! }, data });
+    return serializeUser(user);
+  });
 }

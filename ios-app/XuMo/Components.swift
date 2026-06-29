@@ -1,5 +1,41 @@
 import SwiftUI
 
+// MARK: 头像（有真实照片用照片，否则色块+首字）
+struct AvatarView: View {
+    let url: String?
+    let colorHex: String
+    let name: String
+    var size: CGFloat = 36
+
+    private var fullURL: URL? {
+        guard let u = url, !u.isEmpty else { return nil }
+        return URL(string: u.hasPrefix("http") ? u : AppConfig.baseURL + u)
+    }
+
+    var body: some View {
+        Group {
+            if let fullURL {
+                AsyncImage(url: fullURL) { phase in
+                    switch phase {
+                    case .success(let img): img.resizable().scaledToFill()
+                    default: placeholder
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+    }
+
+    private var placeholder: some View {
+        Circle().fill(Color(hex: colorHex))
+            .overlay(Text(String(name.prefix(1)))
+                .font(.system(size: size * 0.42, weight: .semibold)).foregroundStyle(.white))
+    }
+}
+
 // MARK: 屏幕背景（作者提供的植物线描素材 IMG_9479）
 
 struct ScreenBackground: View {

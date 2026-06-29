@@ -35,6 +35,9 @@ services:
       PORT: "3000"
     ports:
       - "3000:3000"
+    volumes:
+      - uploads:/app/uploads   # 头像图片持久化
 
 volumes:
   pgdata:
+  uploads:

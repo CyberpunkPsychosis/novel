@@ -71,6 +71,35 @@ struct APIClient {
             throw APIError.decoding
         }
     }
+
+    /// multipart 上传单文件（头像）。
+    func upload<T: Decodable>(_ path: String, fileData: Data, filename: String,
+                             mime: String, auth: Bool = true) async throws -> T {
+        guard let url = URL(string: AppConfig.baseURL + path) else { throw APIError.badURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        let boundary = "Boundary-\(UUID().uuidString)"
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        if auth, let token = TokenStore.token {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mime)\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        req.httpBody = body
+
+        let data: Data, resp: URLResponse
+        do { (data, resp) = try await session.data(for: req) } catch { throw APIError.offline }
+        guard let http = resp as? HTTPURLResponse else { throw APIError.offline }
+        if http.statusCode == 401 { throw APIError.unauthorized }
+        guard (200..<300).contains(http.statusCode) else {
+            throw APIError.badStatus(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        do { return try decoder.decode(T.self, from: data) } catch { throw APIError.decoding }
+    }
 }
 
 // MARK: 接口出入参（与后端 JSON 对齐）
@@ -116,3 +145,4 @@ struct CreditsResponse: Decodable {
 struct CheckinResponse: Decodable { let award: Int; let streak: Int }
 struct BalanceResponse: Decodable { let balance: Int }
 struct RatingResponse: Decodable { let ratingAvg: Double; let ratingCount: Int; let mine: Int }
+struct AvatarResponse: Decodable { let avatarUrl: String; let user: LocalUser }

@@ -12,6 +12,7 @@ struct BookDetailView: View {
     private var isOwner: Bool { store.isOwner(book) }
     private var perm: ForkPermission { store.permission(for: book.id) }
     private var moderation: ModerationStatus { store.moderationStatus(for: book.id) }
+    private var shelf: String? { store.shelfStatus(book.id) }
     /// 这本书是否有可视化的分支（有真实 fork 子书才显示）。
     private var hasBranches: Bool { !children.isEmpty }
 
@@ -124,12 +125,25 @@ struct BookDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    store.toggleFavorite(book.id)
-                    toast = store.isFavorite(book.id) ? "已加入收藏" : "已取消收藏"
+                Menu {
+                    Button { store.setShelf(book.id, status: "want"); toast = "已加入「想读」" } label: {
+                        Label("想读", systemImage: shelf == "want" ? "checkmark" : "bookmark")
+                    }
+                    Button { store.setShelf(book.id, status: "reading"); toast = "已标为「在读」" } label: {
+                        Label("在读", systemImage: shelf == "reading" ? "checkmark" : "book")
+                    }
+                    Button { store.setShelf(book.id, status: "read"); toast = "已标为「读过」" } label: {
+                        Label("读过", systemImage: shelf == "read" ? "checkmark" : "checkmark.seal")
+                    }
+                    if shelf != nil {
+                        Divider()
+                        Button(role: .destructive) { store.setShelf(book.id, status: nil); toast = "已移出书架" } label: {
+                            Label("移出书架", systemImage: "trash")
+                        }
+                    }
                 } label: {
-                    Image(systemName: store.isFavorite(book.id) ? "heart.fill" : "heart")
-                        .foregroundStyle(store.isFavorite(book.id) ? Theme.terracotta : Theme.sub)
+                    Image(systemName: shelf == nil ? "bookmark" : "bookmark.fill")
+                        .foregroundStyle(shelf == nil ? Theme.sub : Theme.terracotta)
                 }
             }
         }
@@ -194,25 +208,47 @@ struct RatingRow: View {
     @EnvironmentObject var store: LibraryStore
     let book: Book
     private var mine: Int { store.myRating(for: book.id) }
+    private var maxCount: Int { max(book.ratingDist.max() ?? 0, 1) }
 
     var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(book.ratingCount > 0 ? String(format: "%.1f", book.ratingAvg) : "暂无评分")
-                    .font(Theme.serif(18, .bold)).foregroundStyle(Theme.ink)
-                if book.ratingCount > 0 {
-                    Text("\(book.ratingCount) 人评分").font(.caption2).foregroundStyle(Theme.sub)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(book.ratingCount > 0 ? String(format: "%.1f", book.ratingAvg) : "暂无评分")
+                        .font(Theme.serif(18, .bold)).foregroundStyle(Theme.ink)
+                    if book.ratingCount > 0 {
+                        Text("\(book.ratingCount) 人评分").font(.caption2).foregroundStyle(Theme.sub)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(mine > 0 ? "我的评分" : "点星评分").font(.caption2).foregroundStyle(Theme.sub)
+                    HStack(spacing: 3) {
+                        ForEach(1...5, id: \.self) { i in
+                            Image(systemName: i <= mine ? "star.fill" : "star")
+                                .font(.system(size: 16))
+                                .foregroundStyle(i <= mine ? Theme.bronze : Theme.line)
+                                .onTapGesture { store.rate(book.id, value: i) }
+                        }
+                    }
                 }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(mine > 0 ? "我的评分" : "点星评分").font(.caption2).foregroundStyle(Theme.sub)
-                HStack(spacing: 3) {
-                    ForEach(1...5, id: \.self) { i in
-                        Image(systemName: i <= mine ? "star.fill" : "star")
-                            .font(.system(size: 16))
-                            .foregroundStyle(i <= mine ? Theme.bronze : Theme.line)
-                            .onTapGesture { store.rate(book.id, value: i) }
+            // 评分分布（5★→1★）
+            if book.ratingCount > 0 && book.ratingDist.count == 5 {
+                VStack(spacing: 3) {
+                    ForEach((1...5).reversed(), id: \.self) { star in
+                        let c = book.ratingDist[star - 1]
+                        HStack(spacing: 6) {
+                            Text("\(star)★").font(.caption2).foregroundStyle(Theme.sub).frame(width: 22, alignment: .leading)
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule().fill(Theme.line.opacity(0.4))
+                                    Capsule().fill(Theme.bronze)
+                                        .frame(width: geo.size.width * CGFloat(c) / CGFloat(maxCount))
+                                }
+                            }.frame(height: 6)
+                            Text("\(c)").font(.caption2).foregroundStyle(Theme.sub).frame(width: 22, alignment: .trailing)
+                        }
                     }
                 }
             }
@@ -278,8 +314,7 @@ struct ReviewRow: View {
     let onLike: () async -> Void
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Circle().fill(Color(hex: review.avatarColorHex)).frame(width: 32, height: 32)
-                .overlay(Text(String(review.author.prefix(1))).font(.caption).foregroundStyle(.white))
+            AvatarView(url: review.avatarUrl, colorHex: review.avatarColorHex, name: review.author, size: 32)
             VStack(alignment: .leading, spacing: 3) {
                 Text(review.author).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
                 Text(review.text).font(.subheadline).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(3)

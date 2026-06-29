@@ -5,9 +5,7 @@ struct ForkRequestsInboxView: View {
     @EnvironmentObject var store: LibraryStore
 
     private var incoming: [ForkRequest] { store.incomingForkRequests }
-    private var outgoing: [ForkRequest] {
-        store.forkRequests.filter { $0.requester == store.currentUser?.penName && !incoming.contains($0) }
-    }
+    private var outgoing: [ForkRequest] { store.outgoingRequests }
 
     var body: some View {
         ZStack {
@@ -40,6 +38,7 @@ struct ForkRequestsInboxView: View {
         }
         .navigationTitle("改编申请")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await store.loadIncomingRequests(); await store.loadOutgoingRequests() }
     }
 }
 

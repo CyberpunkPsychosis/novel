@@ -6,44 +6,61 @@ async function uid(req: any): Promise<string | null> {
   try { return ((await req.jwtVerify()) as { uid: string }).uid; } catch { return null; }
 }
 
+type TopicRow = {
+  id: string; title: string; createdAt: Date;
+  user: { penName: string; avatarColorHex: string; avatarUrl?: string | null };
+  _count: { replies: number };
+};
+function serializeTopicItem(t: TopicRow) {
+  return {
+    id: t.id, title: t.title,
+    author: t.user.penName, avatarColorHex: t.user.avatarColorHex, avatarUrl: t.user.avatarUrl ?? null,
+    replyCount: t._count.replies,
+    meta: `${relativeTime(t.createdAt)} · ${t._count.replies} 回帖`,
+  };
+}
+
 export async function socialRoutes(app: FastifyInstance) {
-  // ===== 收藏 =====
-  app.get("/me/favorites", { preHandler: [app.authenticate] }, async (req) => {
+  // ===== 书架：想读 / 在读 / 读过 =====
+  app.get("/me/shelf", { preHandler: [app.authenticate] }, async (req) => {
     const rows = await prisma.favorite.findMany({ where: { userId: req.userId! } });
-    return rows.map((r) => r.bookId);
+    const out: Record<string, string> = {};
+    for (const r of rows) out[r.bookId] = r.status;
+    return out;
   });
 
-  // POST /books/:id/favorite -> { favorited }（切换）
-  app.post<{ Params: { id: string } }>(
-    "/books/:id/favorite", { preHandler: [app.authenticate] }, async (req, reply) => {
+  // PUT /books/:id/shelf { status: want|reading|read } -> { status }
+  app.put<{ Params: { id: string } }>(
+    "/books/:id/shelf", { preHandler: [app.authenticate] }, async (req, reply) => {
+      const status = String((req.body as { status?: string })?.status ?? "");
+      if (!["want", "reading", "read"].includes(status)) {
+        return reply.code(400).send({ error: "status 必须是 want/reading/read" });
+      }
       const book = await prisma.book.findUnique({ where: { id: req.params.id } });
       if (!book) return reply.code(404).send({ error: "书不存在" });
-      const existing = await prisma.favorite.findUnique({
+      await prisma.favorite.upsert({
         where: { userId_bookId: { userId: req.userId!, bookId: book.id } },
+        create: { userId: req.userId!, bookId: book.id, status },
+        update: { status },
       });
-      if (existing) {
-        await prisma.favorite.delete({ where: { id: existing.id } });
-        return { favorited: false };
-      }
-      await prisma.favorite.create({ data: { userId: req.userId!, bookId: book.id } });
-      return { favorited: true };
+      return { status };
     });
 
-  // ===== 话题 =====
-  // GET /topics -> [{id,title,author,avatarColorHex,replyCount,meta}]（按回帖热度+时间）
+  // DELETE /books/:id/shelf -> { ok }（移出书架）
+  app.delete<{ Params: { id: string } }>(
+    "/books/:id/shelf", { preHandler: [app.authenticate] }, async (req) => {
+      await prisma.favorite.deleteMany({ where: { userId: req.userId!, bookId: req.params.id } });
+      return { ok: true };
+    });
+
+  // ===== 全站话题（clubId = null）=====
   app.get("/topics", async () => {
     const rows = await prisma.topic.findMany({
+      where: { clubId: null },
       include: { user: true, _count: { select: { replies: true } } },
       orderBy: { createdAt: "desc" },
     });
-    return rows
-      .map((t) => ({
-        id: t.id, title: t.title, author: t.user.penName,
-        avatarColorHex: t.user.avatarColorHex,
-        replyCount: t._count.replies,
-        meta: `${relativeTime(t.createdAt)} · ${t._count.replies} 回帖`,
-      }))
-      .sort((a, b) => b.replyCount - a.replyCount);
+    return rows.map(serializeTopicItem).sort((a, b) => b.replyCount - a.replyCount);
   });
 
   app.post("/topics", { preHandler: [app.authenticate] }, async (req, reply) => {
@@ -52,14 +69,12 @@ export async function socialRoutes(app: FastifyInstance) {
     if (!title) return reply.code(400).send({ error: "话题标题不能为空" });
     const t = await prisma.topic.create({
       data: { userId: req.userId!, title, body: (b.body ?? "").trim() },
-      include: { user: true },
+      include: { user: true, _count: { select: { replies: true } } },
     });
-    return { id: t.id, title: t.title, author: t.user.penName,
-             avatarColorHex: t.user.avatarColorHex, replyCount: 0,
-             meta: `刚刚 · 0 回帖` };
+    return serializeTopicItem(t);
   });
 
-  // GET /topics/:id -> { id,title,body,author,date, replies:[...] }
+  // GET /topics/:id -> { id,title,body,author,avatarUrl,date, replies:[...] }
   app.get<{ Params: { id: string } }>("/topics/:id", async (req, reply) => {
     const t = await prisma.topic.findUnique({
       where: { id: req.params.id },
@@ -68,10 +83,11 @@ export async function socialRoutes(app: FastifyInstance) {
     if (!t) return reply.code(404).send({ error: "话题不存在" });
     return {
       id: t.id, title: t.title, body: t.body,
-      author: t.user.penName, avatarColorHex: t.user.avatarColorHex, date: t.createdAt,
+      author: t.user.penName, avatarColorHex: t.user.avatarColorHex, avatarUrl: t.user.avatarUrl ?? null,
+      date: t.createdAt,
       replies: t.replies.map((r) => ({
         id: r.id, author: r.user.penName, avatarColorHex: r.user.avatarColorHex,
-        text: r.text, date: r.createdAt,
+        avatarUrl: r.user.avatarUrl ?? null, text: r.text, date: r.createdAt,
       })),
     };
   });
@@ -87,11 +103,10 @@ export async function socialRoutes(app: FastifyInstance) {
         include: { user: true },
       });
       return { id: r.id, author: r.user.penName, avatarColorHex: r.user.avatarColorHex,
-               text: r.text, date: r.createdAt };
+               avatarUrl: r.user.avatarUrl ?? null, text: r.text, date: r.createdAt };
     });
 
   // ===== 俱乐部 =====
-  // GET /clubs -> [{id,name,intro,memberCount,joinedByMe}]
   app.get("/clubs", async (req) => {
     const me = await uid(req);
     const rows = await prisma.club.findMany({
@@ -105,6 +120,49 @@ export async function socialRoutes(app: FastifyInstance) {
       joinedByMe: me ? (c as any).members.length > 0 : false,
     }));
   });
+
+  // GET /clubs/:id -> 详情（信息 + 成员 + 我是否加入）
+  app.get<{ Params: { id: string } }>("/clubs/:id", async (req, reply) => {
+    const me = await uid(req);
+    const c = await prisma.club.findUnique({
+      where: { id: req.params.id },
+      include: { members: { include: { user: true }, take: 30, orderBy: { createdAt: "asc" } } },
+    });
+    if (!c) return reply.code(404).send({ error: "俱乐部不存在" });
+    return {
+      id: c.id, name: c.name, intro: c.intro,
+      memberCount: c.members.length,
+      joinedByMe: me ? c.members.some((m) => m.userId === me) : false,
+      members: c.members.map((m) => ({
+        penName: m.user.penName, avatarColorHex: m.user.avatarColorHex, avatarUrl: m.user.avatarUrl ?? null,
+      })),
+    };
+  });
+
+  // GET /clubs/:id/topics -> 该俱乐部讨论列表
+  app.get<{ Params: { id: string } }>("/clubs/:id/topics", async (req) => {
+    const rows = await prisma.topic.findMany({
+      where: { clubId: req.params.id },
+      include: { user: true, _count: { select: { replies: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(serializeTopicItem);
+  });
+
+  // POST /clubs/:id/topics { title, body? } -> 发讨论
+  app.post<{ Params: { id: string } }>(
+    "/clubs/:id/topics", { preHandler: [app.authenticate] }, async (req, reply) => {
+      const b = (req.body ?? {}) as { title?: string; body?: string };
+      const title = (b.title ?? "").trim();
+      if (!title) return reply.code(400).send({ error: "标题不能为空" });
+      const club = await prisma.club.findUnique({ where: { id: req.params.id } });
+      if (!club) return reply.code(404).send({ error: "俱乐部不存在" });
+      const t = await prisma.topic.create({
+        data: { userId: req.userId!, title, body: (b.body ?? "").trim(), clubId: club.id },
+        include: { user: true, _count: { select: { replies: true } } },
+      });
+      return serializeTopicItem(t);
+    });
 
   // POST /clubs/:id/join -> { joined, memberCount }（切换）
   app.post<{ Params: { id: string } }>(

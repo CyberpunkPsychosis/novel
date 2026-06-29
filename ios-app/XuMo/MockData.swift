@@ -6,6 +6,7 @@ struct CommunityEvent: Identifiable {
     let id = UUID()
     let who: String
     let avatarColorHex: String
+    var avatarUrl: String? = nil
     let text: String
     let meta: String       // 时间 · 类型
 }

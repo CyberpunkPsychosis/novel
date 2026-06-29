@@ -33,12 +33,14 @@ struct Book: Codable, Identifiable, Hashable {
     /// 服务器聚合的评分均值与人数。
     var ratingAvg: Double = 0
     var ratingCount: Int = 0
+    /// 1..5 星各自人数（评分分布）。
+    var ratingDist: [Int] = []
 
     enum CodingKeys: String, CodingKey {
         case id, title, author, blurb, tags, tagline
         case coverColors, coverAccent, status
         case forkOf, forkFromChapter, isUserCreated, chapters
-        case moderationStatus, ratingAvg, ratingCount
+        case moderationStatus, ratingAvg, ratingCount, ratingDist
     }
 }
 
@@ -62,5 +64,6 @@ extension Book {
         moderationStatus = (try? c.decode(String.self, forKey: .moderationStatus)) ?? "approved"
         ratingAvg = (try? c.decode(Double.self, forKey: .ratingAvg)) ?? 0
         ratingCount = (try? c.decode(Int.self, forKey: .ratingCount)) ?? 0
+        ratingDist = (try? c.decode([Int].self, forKey: .ratingDist)) ?? []
     }
 }

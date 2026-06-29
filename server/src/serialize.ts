@@ -27,6 +27,11 @@ export function serializeBook(b: BookRow) {
   const ratingAvg = ratingCount
     ? ratings.reduce((s, r) => s + r.value, 0) / ratingCount
     : 0;
+  // 1..5 星各自人数
+  const ratingDist = [0, 0, 0, 0, 0];
+  for (const r of ratings) {
+    if (r.value >= 1 && r.value <= 5) ratingDist[r.value - 1] += 1;
+  }
   return {
     id: b.id,
     title: b.title,
@@ -43,6 +48,7 @@ export function serializeBook(b: BookRow) {
     moderationStatus: b.moderationStatus ?? "approved",
     ratingAvg: Math.round(ratingAvg * 10) / 10,
     ratingCount,
+    ratingDist,
     chapters: (b.chapters ?? [])
       .slice()
       .sort((a, c) => a.index - c.index)
@@ -56,6 +62,7 @@ type UserRow = {
   penName: string;
   bio: string;
   avatarColorHex: string;
+  avatarUrl?: string | null;
 };
 
 // 对齐 iOS LocalUser（id 用 handle 以外字段也行，这里直接用 handle 当展示 id）。
@@ -66,6 +73,7 @@ export function serializeUser(u: UserRow) {
     penName: u.penName,
     bio: u.bio,
     avatarColorHex: u.avatarColorHex,
+    avatarUrl: u.avatarUrl ?? null,
   };
 }
 
@@ -81,6 +89,11 @@ export function serializeNotification(n: {
   id: string; type: string; actor: string; text: string; read: boolean; createdAt: Date;
 }) {
   return { id: n.id, type: n.type, actor: n.actor, text: n.text, read: n.read, date: n.createdAt };
+}
+
+// 拼头像字段（penName/avatarColorHex/avatarUrl）的小工具，给评论/回帖/成员复用。
+export function authorFields(u: { penName: string; avatarColorHex: string; avatarUrl?: string | null }) {
+  return { author: u.penName, avatarColorHex: u.avatarColorHex, avatarUrl: u.avatarUrl ?? null };
 }
 
 // iOS ForkRequest.requester 是笔名字符串、bookID 大写。

@@ -17,11 +17,19 @@ export async function communityRoutes(app: FastifyInstance) {
       const book = await prisma.book.findUnique({ where: { id: req.params.id } });
       if (!book) return reply.code(404).send({ error: "书不存在" });
 
-      const r = await prisma.review.create({
-        data: { userId: me.id, bookId: book.id, text },
+      // 一书一条书评（可改）；仅首次记活动，防刷屏。
+      const prior = await prisma.review.findUnique({
+        where: { userId_bookId: { userId: me.id, bookId: book.id } },
+      });
+      const r = await prisma.review.upsert({
+        where: { userId_bookId: { userId: me.id, bookId: book.id } },
+        create: { userId: me.id, bookId: book.id, text },
+        update: { text },
         include: { user: true, likes: true },
       });
-      await logActivity(me.id, "review", `评论《${book.title}》：${text.slice(0, 20)}`, book.id);
+      if (!prior) {
+        await logActivity(me.id, "review", `评论《${book.title}》：${text.slice(0, 20)}`, book.id);
+      }
       return serializeReview(r, me.id);
     });
 
@@ -70,21 +78,33 @@ export async function communityRoutes(app: FastifyInstance) {
       return { liked, likeCount };
     });
 
-  // GET /feed -> [{who, avatarColorHex, text, meta, bookId}]  全站近期动态
+  // GET /feed -> [{who, avatarColorHex, avatarUrl, text, meta, bookId}]  全站近期动态
   app.get("/feed", async () => {
     const rows = await prisma.activity.findMany({
       include: { user: true },
       orderBy: { createdAt: "desc" },
-      take: 40,
+      take: 80,
     });
-    return rows.map((a) => ({
-      id: a.id,
-      who: a.user.penName,
-      avatarColorHex: a.user.avatarColorHex,
-      text: a.text,
-      meta: `${relativeTime(a.createdAt)} · ${typeLabel[a.type] ?? a.type}`,
-      bookId: a.bookId,
-    }));
+    // 过滤掉指向"未通过审核"书的活动（Activity 无 book 关系，故代码侧过滤）
+    const bookIds = [...new Set(rows.map((a) => a.bookId).filter((x): x is string => !!x))];
+    const rejected = new Set(
+      (await prisma.book.findMany({
+        where: { id: { in: bookIds }, moderationStatus: { not: "approved" } },
+        select: { id: true },
+      })).map((b) => b.id)
+    );
+    return rows
+      .filter((a) => !a.bookId || !rejected.has(a.bookId))
+      .slice(0, 40)
+      .map((a) => ({
+        id: a.id,
+        who: a.user.penName,
+        avatarColorHex: a.user.avatarColorHex,
+        avatarUrl: a.user.avatarUrl ?? null,
+        text: a.text,
+        meta: `${relativeTime(a.createdAt)} · ${typeLabel[a.type] ?? a.type}`,
+        bookId: a.bookId,
+      }));
   });
 
   // GET /me/stats -> { creations, reviews, likesReceived }
@@ -110,7 +130,7 @@ async function currentUserId(app: FastifyInstance, req: any): Promise<string | n
 
 function serializeReview(
   r: { id: string; text: string; createdAt: Date; bookId: string;
-       user: { penName: string; avatarColorHex: string };
+       user: { penName: string; avatarColorHex: string; avatarUrl?: string | null };
        likes: { userId: string }[] },
   meId: string | null
 ) {
@@ -118,6 +138,7 @@ function serializeReview(
     id: r.id,
     author: r.user.penName,
     avatarColorHex: r.user.avatarColorHex,
+    avatarUrl: r.user.avatarUrl ?? null,
     bookID: r.bookId,
     text: r.text,
     date: r.createdAt,

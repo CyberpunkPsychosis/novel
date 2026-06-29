@@ -7,7 +7,8 @@ struct ShelfView: View {
     private let grid = [GridItem(.adaptive(minimum: 100), spacing: 16)]
     private var reading: [Book] { store.inProgressBooks }
     private var mine: [Book] { store.myCreations }
-    private var favorites: [Book] { store.favoriteBooks }
+    private var wantBooks: [Book] { store.booksOnShelf("want") }
+    private var readBooks: [Book] { store.booksOnShelf("read") }
 
     var body: some View {
         ZStack {
@@ -47,16 +48,25 @@ struct ShelfView: View {
                         }
                     }
 
-                    SectionHeader(title: "收藏")
-                    if favorites.isEmpty {
-                        Text("还没有收藏。进任意一本书，点右上角 ♡ 即可加入收藏。")
+                    SectionHeader(title: "想读")
+                    if wantBooks.isEmpty {
+                        Text("还没有想读的书。进任意一本书，点右上角书签 → 想读。")
                             .font(.footnote).foregroundStyle(Theme.sub)
                             .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
                     } else {
                         LazyVGrid(columns: grid, spacing: 18) {
-                            ForEach(favorites) { b in
+                            ForEach(wantBooks) { b in
+                                NavigationLink(value: b.id) { CoverView(book: b) }.buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    if !readBooks.isEmpty {
+                        SectionHeader(title: "读过")
+                        LazyVGrid(columns: grid, spacing: 18) {
+                            ForEach(readBooks) { b in
                                 NavigationLink(value: b.id) { CoverView(book: b) }.buttonStyle(.plain)
                             }
                         }
@@ -64,7 +74,7 @@ struct ShelfView: View {
                 }
                 .padding(20)
             }
-            .refreshable { await store.refreshBooks(); await store.loadFavorites() }
+            .refreshable { await store.refreshBooks(); await store.loadShelf() }
         }
         .navigationTitle("书架")
         .navigationBarTitleDisplayMode(.inline)

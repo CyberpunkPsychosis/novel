@@ -11,6 +11,7 @@ struct LocalUser: Codable, Identifiable, Hashable {
     var penName: String            // 笔名 / 显示名
     var bio: String = "慢慢长大的书架"
     var avatarColorHex: String = "#A65A3C"
+    var avatarUrl: String? = nil
 
     /// 种子书的作者（非当前用户），用于区分"别人的书"。
     static let seedAuthorName = "观山海"
@@ -155,6 +156,7 @@ struct BookReview: Codable, Identifiable, Hashable {
     var id: String
     var author: String
     var avatarColorHex: String
+    var avatarUrl: String? = nil
     var bookID: String
     var text: String
     var date: Date
@@ -167,6 +169,7 @@ struct FeedItem: Codable, Identifiable, Hashable {
     var id: String
     var who: String
     var avatarColorHex: String
+    var avatarUrl: String? = nil
     var text: String
     var meta: String
     var bookId: String?
@@ -186,6 +189,7 @@ struct TopicItem: Codable, Identifiable, Hashable {
     var title: String
     var author: String
     var avatarColorHex: String
+    var avatarUrl: String? = nil
     var replyCount: Int
     var meta: String
 }
@@ -193,6 +197,7 @@ struct TopicReplyItem: Codable, Identifiable, Hashable {
     var id: String
     var author: String
     var avatarColorHex: String
+    var avatarUrl: String? = nil
     var text: String
     var date: Date
 }
@@ -202,6 +207,7 @@ struct TopicDetail: Codable, Hashable {
     var body: String
     var author: String
     var avatarColorHex: String
+    var avatarUrl: String? = nil
     var date: Date
     var replies: [TopicReplyItem]
 }
@@ -213,6 +219,19 @@ struct ClubItem: Codable, Identifiable, Hashable {
     var intro: String
     var memberCount: Int
     var joinedByMe: Bool
+}
+struct ClubMemberItem: Codable, Hashable {
+    var penName: String
+    var avatarColorHex: String
+    var avatarUrl: String? = nil
+}
+struct ClubDetail: Codable, Hashable {
+    var id: String
+    var name: String
+    var intro: String
+    var memberCount: Int
+    var joinedByMe: Bool
+    var members: [ClubMemberItem]
 }
 struct JoinResult: Codable { var joined: Bool; var memberCount: Int }
 

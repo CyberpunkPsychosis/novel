@@ -141,6 +141,16 @@ export async function forkRoutes(app: FastifyInstance) {
     return rows.map(serializeForkRequest);
   });
 
+  // GET /me/fork-requests/outgoing  我发出的申请
+  app.get("/me/fork-requests/outgoing", { preHandler: [app.authenticate] }, async (req) => {
+    const rows = await prisma.forkRequest.findMany({
+      where: { requesterId: req.userId! },
+      include: { requester: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map(serializeForkRequest);
+  });
+
   // POST /fork-requests/:id/decide  作者同意/拒绝
   app.post<{ Params: { id: string } }>(
     "/fork-requests/:id/decide", { preHandler: [app.authenticate] }, async (req, reply) => {

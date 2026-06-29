@@ -41,7 +41,8 @@ struct CommunityView: View {
                     SectionHeader(title: "书友俱乐部")
                     HStack(spacing: 12) {
                         ForEach(store.clubs) { c in
-                            ClubCard(club: c) { store.toggleClub(c.id) }
+                            NavigationLink { ClubDetailView(clubID: c.id) } label: { ClubCard(club: c) }
+                                .buttonStyle(.plain)
                         }
                     }
 
@@ -105,24 +106,104 @@ struct CommunityComposeSheet: View {
 
 struct ClubCard: View {
     let club: ClubItem
-    let onToggle: () -> Void
     var body: some View {
         VStack(spacing: 6) {
             Image(systemName: "leaf").foregroundStyle(Theme.olive)
             Text(club.name).font(Theme.serif(14, .semibold)).foregroundStyle(Theme.ink)
             Text("\(club.memberCount) 成员").font(.caption2).foregroundStyle(Theme.sub)
-            Button(action: onToggle) {
-                Text(club.joinedByMe ? "已加入" : "加入").font(.caption2)
-                    .foregroundStyle(club.joinedByMe ? Theme.sub : .white)
-                    .padding(.horizontal, 12).padding(.vertical, 4)
-                    .background(club.joinedByMe ? Theme.line.opacity(0.5) : Theme.terracotta)
-                    .clipShape(Capsule())
-            }.buttonStyle(.plain)
+            Text(club.joinedByMe ? "已加入" : "查看")
+                .font(.caption2).foregroundStyle(club.joinedByMe ? Theme.olive : Theme.sub)
         }
         .frame(maxWidth: .infinity)
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.line, lineWidth: 1))
+    }
+}
+
+/// 俱乐部详情：简介 + 加入/退出 + 成员 + 讨论区
+struct ClubDetailView: View {
+    @EnvironmentObject var store: LibraryStore
+    let clubID: String
+    @State private var detail: ClubDetail?
+    @State private var topics: [TopicItem] = []
+    @State private var showCompose = false
+
+    var body: some View {
+        ZStack {
+            ScreenBackground(opacity: 0.5)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if let d = detail {
+                        Text(d.name).font(Theme.serif(22, .bold)).foregroundStyle(Theme.ink)
+                        if !d.intro.isEmpty {
+                            Text(d.intro).font(.subheadline).foregroundStyle(Theme.sub)
+                        }
+                        Button {
+                            store.toggleClub(clubID)
+                            Task { detail = await store.clubDetail(clubID) }
+                        } label: {
+                            Text(d.joinedByMe ? "退出俱乐部" : "加入俱乐部")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(d.joinedByMe ? Theme.sub : .white)
+                                .frame(maxWidth: .infinity).padding(.vertical, 11)
+                                .background(d.joinedByMe ? Theme.line.opacity(0.5) : Theme.terraDeep)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }.buttonStyle(.plain)
+
+                        SectionHeader(title: "成员 \(d.memberCount)")
+                        if d.members.isEmpty {
+                            Text("还没有成员，第一个加入吧。").font(.caption).foregroundStyle(Theme.sub)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 14) {
+                                    ForEach(Array(d.members.enumerated()), id: \.offset) { _, m in
+                                        VStack(spacing: 4) {
+                                            AvatarView(url: m.avatarUrl, colorHex: m.avatarColorHex, name: m.penName, size: 44)
+                                            Text(m.penName).font(.caption2).foregroundStyle(Theme.sub).lineLimit(1)
+                                        }.frame(width: 56)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        ProgressView().padding(.top, 40)
+                    }
+
+                    HStack {
+                        SectionHeader(title: "讨论")
+                        Spacer()
+                        Button { showCompose = true } label: {
+                            Label("发讨论", systemImage: "plus").font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.terraDeep)
+                        }
+                    }
+                    if topics.isEmpty {
+                        Text("还没有讨论，开个头吧。").font(.footnote).foregroundStyle(Theme.sub)
+                    } else {
+                        ForEach(topics) { t in
+                            NavigationLink { TopicDetailView(topicID: t.id, title: t.title) } label: {
+                                CategoryBanner(text: t.title, count: t.replyCount, color: Theme.olive)
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(20)
+            }
+        }
+        .navigationTitle("俱乐部")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await reload() }
+        .sheet(isPresented: $showCompose) {
+            CommunityComposeSheet { title in
+                Task { await store.postClubTopic(clubID, title: title, body: ""); topics = await store.clubTopics(clubID) }
+            }
+        }
+    }
+
+    private func reload() async {
+        detail = await store.clubDetail(clubID)
+        topics = await store.clubTopics(clubID)
     }
 }
 
@@ -183,8 +264,7 @@ struct TopicDetailView: View {
 
     @ViewBuilder private func replyRow(_ r: TopicReplyItem) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Circle().fill(Color(hex: r.avatarColorHex)).frame(width: 30, height: 30)
-                .overlay(Text(String(r.author.prefix(1))).font(.caption2).foregroundStyle(.white))
+            AvatarView(url: r.avatarUrl, colorHex: r.avatarColorHex, name: r.author, size: 30)
             VStack(alignment: .leading, spacing: 3) {
                 Text(r.author).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
                 Text(r.text).font(.subheadline).foregroundStyle(Theme.ink.opacity(0.85))
@@ -212,9 +292,7 @@ struct FeedRow: View {
     let event: CommunityEvent
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Circle().fill(Color(hex: event.avatarColorHex))
-                .frame(width: 34, height: 34)
-                .overlay(Text(String(event.who.prefix(1))).font(.caption).foregroundStyle(.white))
+            AvatarView(url: event.avatarUrl, colorHex: event.avatarColorHex, name: event.who, size: 34)
             VStack(alignment: .leading, spacing: 3) {
                 (Text(event.who).font(.subheadline.weight(.semibold)) + Text(" " + event.text).font(.subheadline))
                     .foregroundStyle(Theme.ink)

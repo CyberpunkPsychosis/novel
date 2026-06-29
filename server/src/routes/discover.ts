@@ -40,12 +40,18 @@ export async function discoverRoutes(app: FastifyInstance) {
       const book = await prisma.book.findUnique({ where: { id: req.params.id } });
       if (!book) return reply.code(404).send({ error: "书不存在" });
 
+      // 是否首次评分（改分不再刷活动流）
+      const prior = await prisma.rating.findUnique({
+        where: { userId_bookId: { userId: req.userId!, bookId: book.id } },
+      });
       await prisma.rating.upsert({
         where: { userId_bookId: { userId: req.userId!, bookId: book.id } },
         create: { userId: req.userId!, bookId: book.id, value },
         update: { value },
       });
-      await logActivity(req.userId!, "rate", `给《${book.title}》打了 ${value} 星`, book.id);
+      if (!prior) {
+        await logActivity(req.userId!, "rate", `给《${book.title}》打了 ${value} 星`, book.id);
+      }
       const ratings = await prisma.rating.findMany({ where: { bookId: book.id } });
       const count = ratings.length;
       const avg = count ? ratings.reduce((s, r) => s + r.value, 0) / count : 0;

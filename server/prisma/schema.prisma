@@ -18,6 +18,7 @@ model User {
   penName        String
   bio            String   @default("慢慢长大的书架")
   avatarColorHex String   @default("#A65A3C")
+  avatarUrl      String?
   createdAt      DateTime @default(now())
 
   books        Book[]            @relation("OwnedBooks")
@@ -193,6 +194,8 @@ model Review {
   text      String
   createdAt DateTime     @default(now())
   likes     ReviewLike[]
+
+  @@unique([userId, bookId])
 }
 
 // 书评点赞（每用户每条一次）。
@@ -218,13 +221,14 @@ model Activity {
   createdAt DateTime @default(now())
 }
 
-// 收藏 / 加入书架。
+// 书架：想读/在读/读过（原"收藏"升级为读书状态）。
 model Favorite {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   bookId    String
   book      Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  status    String   @default("want") // want / reading / read
   createdAt DateTime @default(now())
 
   @@unique([userId, bookId])
@@ -237,6 +241,7 @@ model Topic {
   user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   body      String       @default("")
+  clubId    String? // null=全站话题；非空=该俱乐部小组讨论
   createdAt DateTime     @default(now())
   replies   TopicReply[]
 }

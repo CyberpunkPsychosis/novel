@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// 我的：头像 + 统计块 + 钱包入口 + 菜单
 struct ProfileView: View {
@@ -17,15 +18,19 @@ struct ProfileView: View {
             ScreenBackground(opacity: 0.5)
             ScrollView {
                 VStack(spacing: 18) {
-                    // 头像 + 名字
-                    VStack(spacing: 8) {
-                        Circle().fill(Color(hex: user.avatarColorHex))
-                            .frame(width: 84, height: 84)
-                            .overlay(Text(String(user.penName.prefix(1)))
-                                .font(Theme.serif(34, .bold)).foregroundStyle(.white))
-                        Text(user.penName).font(Theme.serif(20, .bold)).foregroundStyle(Theme.ink)
-                        Text("@\(user.handle) · \(user.bio)").font(.caption).foregroundStyle(Theme.sub)
+                    // 头像 + 名字（点头像/名字进编辑）
+                    NavigationLink { EditProfileView() } label: {
+                        VStack(spacing: 8) {
+                            AvatarView(url: user.avatarUrl, colorHex: user.avatarColorHex,
+                                       name: user.penName, size: 84)
+                            HStack(spacing: 5) {
+                                Text(user.penName).font(Theme.serif(20, .bold)).foregroundStyle(Theme.ink)
+                                Image(systemName: "pencil.circle").font(.caption).foregroundStyle(Theme.sub)
+                            }
+                            Text("@\(user.handle) · \(user.bio)").font(.caption).foregroundStyle(Theme.sub)
+                        }
                     }
+                    .buttonStyle(.plain)
                     .padding(.top, 8)
 
                     // 统计块
@@ -67,6 +72,88 @@ struct ProfileView: View {
         .navigationTitle("我的")
         .navigationBarTitleDisplayMode(.inline)
         .task { await store.loadMyStats() }
+    }
+}
+
+/// 编辑资料：头像（相册上传）+ 笔名 + 简介 + 头像底色
+struct EditProfileView: View {
+    @EnvironmentObject var store: LibraryStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var penName = ""
+    @State private var bio = ""
+    @State private var colorHex = "#A65A3C"
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var busy = false
+
+    private let palette = ["#A65A3C", "#B17D6B", "#6E7042", "#7C4A38", "#1A2332", "#C7A17A"]
+
+    var body: some View {
+        ZStack {
+            Theme.cream.ignoresSafeArea()
+            Form {
+                Section {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 10) {
+                            AvatarView(url: store.currentUser?.avatarUrl, colorHex: colorHex,
+                                       name: penName.isEmpty ? "我" : penName, size: 88)
+                            PhotosPicker(selection: $pickerItem, matching: .images) {
+                                Text(busy ? "上传中…" : "更换头像").font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.terraDeep)
+                            }.disabled(busy)
+                        }
+                        Spacer()
+                    }
+                }
+                .listRowBackground(Color.clear)
+
+                Section("笔名") {
+                    TextField("笔名", text: $penName)
+                }.listRowBackground(Theme.surface)
+
+                Section("简介") {
+                    TextField("一句话简介", text: $bio, axis: .vertical).lineLimit(2...4)
+                }.listRowBackground(Theme.surface)
+
+                Section("头像底色（无照片时显示）") {
+                    HStack(spacing: 12) {
+                        ForEach(palette, id: \.self) { hex in
+                            Circle().fill(Color(hex: hex)).frame(width: 30, height: 30)
+                                .overlay(Circle().stroke(Theme.ink, lineWidth: colorHex == hex ? 2 : 0))
+                                .onTapGesture { colorHex = hex }
+                        }
+                    }
+                }.listRowBackground(Theme.surface)
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle("编辑资料")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存") {
+                    Task { @MainActor in
+                        await store.updateProfile(penName: penName, bio: bio, avatarColorHex: colorHex)
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .onAppear {
+            penName = store.currentUser?.penName ?? ""
+            bio = store.currentUser?.bio ?? ""
+            colorHex = store.currentUser?.avatarColorHex ?? "#A65A3C"
+        }
+        .onChange(of: pickerItem) { _, item in
+            guard let item else { return }
+            Task { @MainActor in
+                busy = true
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    await store.uploadAvatar(data)
+                }
+                busy = false
+            }
+        }
     }
 }
 

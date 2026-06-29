@@ -26,12 +26,14 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var feed: [CommunityEvent] = []
     /// 我的社区统计（GET /me/stats）
     @Published private(set) var myStats = CommunityStats()
-    /// 我收藏的书 id
-    @Published private(set) var favorites: Set<String> = []
+    /// 书架：bookID -> 状态(want/reading/read)
+    @Published private(set) var shelf: [String: String] = [:]
     /// 社区话题
     @Published private(set) var topics: [TopicItem] = []
     /// 书友俱乐部
     @Published private(set) var clubs: [ClubItem] = []
+    /// 我发出的改编/续写申请
+    @Published private(set) var outgoingRequests: [ForkRequest] = []
 
     /// 服务器下发的书（含种子+他人已发布+我已同步的）；离线时来自缓存，再退到 bundle seed。
     private var serverBooks: [Book] = []
@@ -90,6 +92,8 @@ final class LibraryStore: ObservableObject {
         saveProgress()
         // 异步上报进度（失败不阻塞阅读，下次登录/翻页再同步）。
         guard isLoggedIn else { return }
+        // 开始阅读自动置「在读」（已读过则不动）。
+        if shelf[bookID] == nil || shelf[bookID] == "want" { setShelf(bookID, status: "reading") }
         Task {
             let body = try? JSONEncoder().encode(ProgressPayload(bookId: bookID, chapterIndex: chapterIndex))
             _ = try? await APIClient.shared.request("/me/progress", method: "PUT",
@@ -503,9 +507,21 @@ extension LibraryStore {
         myRatings[bookID] = value   // 乐观
         Task {
             let body = try? JSONEncoder().encode(["value": value])
-            _ = try? await APIClient.shared.request("/books/\(bookID)/rating", method: "POST", bodyData: body, auth: true) as RatingResponse
-            await refreshBooks()     // 拉回新的均值/人数
-            await loadMyRatings()
+            // 不再整库刷新（重且抖动）：用返回的均值/分布就地更新该书。
+            if let r = try? await APIClient.shared.request("/books/\(bookID)/rating", method: "POST", bodyData: body, auth: true) as RatingResponse {
+                await MainActor.run { applyRating(bookID, avg: r.ratingAvg, count: r.ratingCount) }
+            }
+        }
+    }
+
+    /// 就地更新某书的评分均值/人数（避免整库 refresh）。
+    @MainActor
+    private func applyRating(_ bookID: String, avg: Double, count: Int) {
+        if let i = serverBooks.firstIndex(where: { $0.id == bookID }) {
+            serverBooks[i].ratingAvg = avg; serverBooks[i].ratingCount = count
+        }
+        if let i = books.firstIndex(where: { $0.id == bookID }) {
+            books[i].ratingAvg = avg; books[i].ratingCount = count
         }
     }
 
@@ -530,7 +546,7 @@ extension LibraryStore {
     func loadFeed() async {
         guard let items: [FeedItem] = try? await APIClient.shared.request("/feed") else { return }
         feed = items.map { CommunityEvent(who: $0.who, avatarColorHex: $0.avatarColorHex,
-                                          text: $0.text, meta: $0.meta) }
+                                          avatarUrl: $0.avatarUrl, text: $0.text, meta: $0.meta) }
     }
 
     @MainActor
@@ -562,27 +578,68 @@ extension LibraryStore {
         (try? await APIClient.shared.request("/me/reviews", auth: true)) ?? []
     }
 
-    // MARK: 收藏
-    func isFavorite(_ bookID: String) -> Bool { favorites.contains(bookID) }
-    var favoriteBooks: [Book] { books.filter { favorites.contains($0.id) } }
+    // MARK: 书架（想读/在读/读过）
+    func shelfStatus(_ bookID: String) -> String? { shelf[bookID] }
+    func booksOnShelf(_ status: String) -> [Book] { books.filter { shelf[$0.id] == status } }
 
     @MainActor
-    func loadFavorites() async {
-        if let ids: [String] = try? await APIClient.shared.request("/me/favorites", auth: true) {
-            favorites = Set(ids)
+    func loadShelf() async {
+        if let s: [String: String] = try? await APIClient.shared.request("/me/shelf", auth: true) {
+            shelf = s
         }
     }
 
-    func toggleFavorite(_ bookID: String) {
-        if favorites.contains(bookID) { favorites.remove(bookID) } else { favorites.insert(bookID) }  // 乐观
+    /// 设书架状态；status 传 nil 表示移出书架。
+    func setShelf(_ bookID: String, status: String?) {
+        if let status { shelf[bookID] = status } else { shelf[bookID] = nil }   // 乐观
         Task {
-            struct Fav: Decodable { let favorited: Bool }
-            if let r = try? await APIClient.shared.request("/books/\(bookID)/favorite", method: "POST", auth: true) as Fav {
-                await MainActor.run { if r.favorited { favorites.insert(bookID) } else { favorites.remove(bookID) } }
+            if let status {
+                let body = try? JSONEncoder().encode(["status": status])
+                _ = try? await APIClient.shared.request("/books/\(bookID)/shelf", method: "PUT", bodyData: body, auth: true) as [String: String]
             } else {
-                await loadFavorites()   // 失败回滚为真状态
+                _ = try? await APIClient.shared.request("/books/\(bookID)/shelf", method: "DELETE", auth: true) as OKResponse
             }
         }
+    }
+
+    // MARK: 个人资料
+    @MainActor
+    func updateProfile(penName: String, bio: String, avatarColorHex: String) async {
+        let body = try? JSONEncoder().encode(["penName": penName, "bio": bio, "avatarColorHex": avatarColorHex])
+        if let u: LocalUser = try? await APIClient.shared.request("/me", method: "PUT", bodyData: body, auth: true) {
+            currentUser = u
+            save(currentUser, to: userURL)
+        }
+    }
+
+    @MainActor
+    func uploadAvatar(_ data: Data) async {
+        if let r: AvatarResponse = try? await APIClient.shared.upload("/me/avatar", fileData: data,
+                                                                      filename: "avatar.jpg", mime: "image/jpeg") {
+            currentUser = r.user
+            save(currentUser, to: userURL)
+        }
+    }
+
+    // MARK: 我发出的申请
+    @MainActor
+    func loadOutgoingRequests() async {
+        if let r: [ForkRequest] = try? await APIClient.shared.request("/me/fork-requests/outgoing", auth: true) {
+            outgoingRequests = r
+        }
+    }
+
+    // MARK: 俱乐部详情 / 讨论
+    func clubDetail(_ id: String) async -> ClubDetail? {
+        try? await APIClient.shared.request("/clubs/\(id)", auth: isLoggedIn)
+    }
+    func clubTopics(_ id: String) async -> [TopicItem] {
+        (try? await APIClient.shared.request("/clubs/\(id)/topics")) ?? []
+    }
+    @discardableResult
+    func postClubTopic(_ clubID: String, title: String, body: String) async -> Bool {
+        let payload = try? JSONEncoder().encode(["title": title, "body": body])
+        return (try? await APIClient.shared.request("/clubs/\(clubID)/topics", method: "POST", bodyData: payload, auth: true) as TopicItem) != nil
     }
 
     // MARK: 话题
@@ -645,9 +702,10 @@ extension LibraryStore {
         await loadRankings()
         await loadFeed()
         await loadMyStats()
-        await loadFavorites()
+        await loadShelf()
         await loadTopics()
         await loadClubs()
+        await loadOutgoingRequests()
     }
 
     @MainActor
