@@ -69,6 +69,8 @@ struct AppNotification: Codable, Identifiable, Hashable {
     var text: String
     var read: Bool = false
     var date: Date
+    var targetKind: String? = nil   // book / forkRequest / topic
+    var targetId: String? = nil
 }
 
 // MARK: fork 授权 / 请求
@@ -94,6 +96,7 @@ enum ForkReqStatus: String, Codable {
 struct ForkRequest: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var requester: String          // 申请人笔名
+    var requesterHandle: String = ""
     var bookID: String
     var fromChapter: Int
     var mode: String               // "续写" / "改编"
@@ -155,6 +158,7 @@ struct BranchGraph {
 struct BookReview: Codable, Identifiable, Hashable {
     var id: String
     var author: String
+    var handle: String = ""
     var avatarColorHex: String
     var avatarUrl: String? = nil
     var bookID: String
@@ -168,6 +172,7 @@ struct BookReview: Codable, Identifiable, Hashable {
 struct FeedItem: Codable, Identifiable, Hashable {
     var id: String
     var who: String
+    var handle: String = ""
     var avatarColorHex: String
     var avatarUrl: String? = nil
     var text: String
@@ -188,6 +193,7 @@ struct TopicItem: Codable, Identifiable, Hashable {
     var id: String
     var title: String
     var author: String
+    var handle: String = ""
     var avatarColorHex: String
     var avatarUrl: String? = nil
     var replyCount: Int
@@ -196,6 +202,7 @@ struct TopicItem: Codable, Identifiable, Hashable {
 struct TopicReplyItem: Codable, Identifiable, Hashable {
     var id: String
     var author: String
+    var handle: String = ""
     var avatarColorHex: String
     var avatarUrl: String? = nil
     var text: String
@@ -206,6 +213,7 @@ struct TopicDetail: Codable, Hashable {
     var title: String
     var body: String
     var author: String
+    var handle: String = ""
     var avatarColorHex: String
     var avatarUrl: String? = nil
     var date: Date
@@ -221,9 +229,21 @@ struct ClubItem: Codable, Identifiable, Hashable {
     var joinedByMe: Bool
 }
 struct ClubMemberItem: Codable, Hashable {
+    var handle: String = ""
     var penName: String
     var avatarColorHex: String
     var avatarUrl: String? = nil
+}
+
+// 他人主页
+struct UserProfile: Codable, Hashable {
+    var handle: String
+    var penName: String
+    var bio: String
+    var avatarColorHex: String
+    var avatarUrl: String? = nil
+    var reviewCount: Int
+    var books: [Book]
 }
 struct ClubDetail: Codable, Hashable {
     var id: String

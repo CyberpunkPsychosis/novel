@@ -19,6 +19,7 @@ type BookRow = {
   moderationStatus?: string;
   moderationReason?: string;
   ownerId?: string | null;
+  featured?: boolean;
   chapters?: ChapterRow[];
   ratings?: { value: number }[];
 };
@@ -50,6 +51,7 @@ export function serializeBook(b: BookRow, meId?: string | null) {
     forkFromChapter: b.forkFromChapter,
     isUserCreated: b.isUserCreated,
     isMine,
+    featured: b.featured ?? false,
     moderationStatus: b.moderationStatus ?? "approved",
     // 审核理由只给作者本人看
     moderationReason: isMine ? (b.moderationReason ?? "") : "",
@@ -94,8 +96,12 @@ export function serializeCreditTxn(t: {
 
 export function serializeNotification(n: {
   id: string; type: string; actor: string; text: string; read: boolean; createdAt: Date;
+  targetKind?: string | null; targetId?: string | null;
 }) {
-  return { id: n.id, type: n.type, actor: n.actor, text: n.text, read: n.read, date: n.createdAt };
+  return {
+    id: n.id, type: n.type, actor: n.actor, text: n.text, read: n.read, date: n.createdAt,
+    targetKind: n.targetKind ?? null, targetId: n.targetId ?? null,
+  };
 }
 
 // 拼头像字段（penName/avatarColorHex/avatarUrl）的小工具，给评论/回帖/成员复用。
@@ -106,11 +112,12 @@ export function authorFields(u: { penName: string; avatarColorHex: string; avata
 // iOS ForkRequest.requester 是笔名字符串、bookID 大写。
 export function serializeForkRequest(r: {
   id: string; bookId: string; fromChapter: number; mode: string; status: string; createdAt: Date;
-  requester?: { penName: string } | null;
+  requester?: { penName: string; handle: string } | null;
 }) {
   return {
     id: r.id,
     requester: r.requester?.penName ?? "",
+    requesterHandle: r.requester?.handle ?? "",
     bookID: r.bookId,
     fromChapter: r.fromChapter,
     mode: r.mode,

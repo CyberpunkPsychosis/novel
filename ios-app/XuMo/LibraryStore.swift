@@ -92,8 +92,15 @@ final class LibraryStore: ObservableObject {
         saveProgress()
         // 异步上报进度（失败不阻塞阅读，下次登录/翻页再同步）。
         guard isLoggedIn else { return }
-        // 开始阅读自动置「在读」（已读过则不动）。
-        if shelf[bookID] == nil || shelf[bookID] == "want" { setShelf(bookID, status: "reading") }
+        // 书架状态自动流转：读到最后一章→读过；否则开始读→在读（读过的不回退）。
+        if let b = book(id: bookID) {
+            let lastIndex = b.chapters.map { $0.index }.max() ?? chapterIndex
+            if chapterIndex >= lastIndex {
+                if shelf[bookID] != "read" { setShelf(bookID, status: "read") }
+            } else if shelf[bookID] == nil || shelf[bookID] == "want" {
+                setShelf(bookID, status: "reading")
+            }
+        }
         Task {
             let body = try? JSONEncoder().encode(ProgressPayload(bookId: bookID, chapterIndex: chapterIndex))
             _ = try? await APIClient.shared.request("/me/progress", method: "PUT",
@@ -115,9 +122,9 @@ final class LibraryStore: ObservableObject {
         let pos = (idxs.firstIndex(of: last) ?? 0) + 1
         return "\(book.author) · \(pos) / \(idxs.count) 章"
     }
-    /// 在读书目（有进度的种子书，按最近读优先粗排）
+    /// 在读书目：书架状态为 reading（统一数据源，含自己的创作；读过的不再算在读）
     var inProgressBooks: [Book] {
-        books.filter { readingProgress[$0.id] != nil && !$0.isUserCreated }
+        books.filter { shelf[$0.id] == "reading" }
     }
 
     // MARK: 改编 / 续写
@@ -531,8 +538,8 @@ extension LibraryStore {
     @MainActor
     func loadFeed() async {
         guard let items: [FeedItem] = try? await APIClient.shared.request("/feed") else { return }
-        feed = items.map { CommunityEvent(who: $0.who, avatarColorHex: $0.avatarColorHex,
-                                          avatarUrl: $0.avatarUrl, text: $0.text, meta: $0.meta) }
+        feed = items.map { CommunityEvent(who: $0.who, handle: $0.handle, avatarColorHex: $0.avatarColorHex,
+                                          avatarUrl: $0.avatarUrl, text: $0.text, meta: $0.meta, bookId: $0.bookId) }
     }
 
     @MainActor
@@ -562,6 +569,11 @@ extension LibraryStore {
 
     func myReviews() async -> [BookReview] {
         (try? await APIClient.shared.request("/me/reviews", auth: true)) ?? []
+    }
+
+    /// 他人主页
+    func userProfile(_ handle: String) async -> UserProfile? {
+        try? await APIClient.shared.request("/users/\(handle)")
     }
 
     // MARK: 书架（想读/在读/读过）

@@ -5,10 +5,12 @@ import Foundation
 struct CommunityEvent: Identifiable {
     let id = UUID()
     let who: String
+    var handle: String = ""
     let avatarColorHex: String
     var avatarUrl: String? = nil
     let text: String
     let meta: String       // 时间 · 类型
+    var bookId: String? = nil
 }
 
 enum MockData {

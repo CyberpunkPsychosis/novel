@@ -116,6 +116,9 @@ async function main() {
   }
   console.log("  ✓ 俱乐部：言情研究所 / 悬疑推理社");
 
+  // 运营精选：标一本为 featured（首页/书店「精选」用，前端不再写死 id）
+  await prisma.book.updateMany({ where: { id: "qianfu" }, data: { featured: true } });
+
   const total = await prisma.chapter.count();
   console.log(`完成：${books.length} 本书，共 ${total} 章。`);
 }

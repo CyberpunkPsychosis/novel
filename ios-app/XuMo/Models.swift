@@ -34,6 +34,8 @@ struct Book: Codable, Identifiable, Hashable {
     var moderationReason: String = ""
     /// 是否当前用户拥有（服务器按 ownerId 判定，替代用笔名比对）。
     var isMine: Bool = false
+    /// 运营精选标记。
+    var featured: Bool = false
     /// 服务器聚合的评分均值与人数。
     var ratingAvg: Double = 0
     var ratingCount: Int = 0
@@ -44,7 +46,7 @@ struct Book: Codable, Identifiable, Hashable {
         case id, title, author, blurb, tags, tagline
         case coverColors, coverAccent, status
         case forkOf, forkFromChapter, isUserCreated, chapters
-        case moderationStatus, moderationReason, isMine
+        case moderationStatus, moderationReason, isMine, featured
         case ratingAvg, ratingCount, ratingDist
     }
 }
@@ -69,6 +71,7 @@ extension Book {
         moderationStatus = (try? c.decode(String.self, forKey: .moderationStatus)) ?? "approved"
         moderationReason = (try? c.decode(String.self, forKey: .moderationReason)) ?? ""
         isMine = (try? c.decode(Bool.self, forKey: .isMine)) ?? false
+        featured = (try? c.decode(Bool.self, forKey: .featured)) ?? false
         ratingAvg = (try? c.decode(Double.self, forKey: .ratingAvg)) ?? 0
         ratingCount = (try? c.decode(Int.self, forKey: .ratingCount)) ?? 0
         ratingDist = (try? c.decode([Int].self, forKey: .ratingDist)) ?? []

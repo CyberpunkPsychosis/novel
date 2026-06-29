@@ -3,24 +3,16 @@ import SwiftUI
 /// 设置：账号 / 偏好 / 安全与合规 / 关于 / 登出。
 struct SettingsView: View {
     @EnvironmentObject var store: LibraryStore
-    @State private var matureContent = false
-    @State private var aiDisclosure = true
 
     var body: some View {
         ZStack {
             Theme.cream.ignoresSafeArea()
             Form {
                 Section("账号") {
+                    NavigationLink("编辑资料") { EditProfileView() }
                     LabeledContent("笔名", value: store.currentUser?.penName ?? "—")
                     LabeledContent("用户名", value: "@\(store.currentUser?.handle ?? "—")")
                 }
-                .listRowBackground(Theme.surface)
-
-                Section {
-                    Toggle("显示成熟向内容", isOn: $matureContent)
-                    Toggle("标注 AI 创作内容", isOn: $aiDisclosure)
-                } header: { Text("内容偏好") }
-                footer: { Text("平台对题材尺度宽松，但仍会自动过滤违法及未成年相关内容。") }
                 .listRowBackground(Theme.surface)
 
                 Section("安全与合规") {

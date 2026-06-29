@@ -12,6 +12,7 @@ struct SearchView: View {
         return store.books.filter { b in
             b.title.localizedCaseInsensitiveContains(q)
             || b.author.localizedCaseInsensitiveContains(q)
+            || b.blurb.localizedCaseInsensitiveContains(q)
             || b.tags.contains { $0.localizedCaseInsensitiveContains(q) }
         }
     }

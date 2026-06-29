@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { prisma } from "../db.js";
-import { relativeTime } from "../platform.js";
+import { notify, relativeTime } from "../platform.js";
+import { serializeBook } from "../serialize.js";
 
 async function uid(req: any): Promise<string | null> {
   try { return ((await req.jwtVerify()) as { uid: string }).uid; } catch { return null; }
@@ -8,13 +9,14 @@ async function uid(req: any): Promise<string | null> {
 
 type TopicRow = {
   id: string; title: string; createdAt: Date;
-  user: { penName: string; avatarColorHex: string; avatarUrl?: string | null };
+  user: { handle: string; penName: string; avatarColorHex: string; avatarUrl?: string | null };
   _count: { replies: number };
 };
 function serializeTopicItem(t: TopicRow) {
   return {
     id: t.id, title: t.title,
-    author: t.user.penName, avatarColorHex: t.user.avatarColorHex, avatarUrl: t.user.avatarUrl ?? null,
+    author: t.user.penName, handle: t.user.handle,
+    avatarColorHex: t.user.avatarColorHex, avatarUrl: t.user.avatarUrl ?? null,
     replyCount: t._count.replies,
     meta: `${relativeTime(t.createdAt)} · ${t._count.replies} 回帖`,
   };
@@ -53,6 +55,25 @@ export async function socialRoutes(app: FastifyInstance) {
       return { ok: true };
     });
 
+  // ===== 他人主页 =====
+  // GET /users/:handle -> { penName, bio, avatar..., books:[已过审创作], reviewCount }
+  app.get<{ Params: { handle: string } }>("/users/:handle", async (req, reply) => {
+    const u = await prisma.user.findUnique({ where: { handle: req.params.handle } });
+    if (!u) return reply.code(404).send({ error: "用户不存在" });
+    const books = await prisma.book.findMany({
+      where: { ownerId: u.id, moderationStatus: "approved" },
+      include: { chapters: true, ratings: true },
+      orderBy: { createdAt: "desc" },
+    });
+    const reviewCount = await prisma.review.count({ where: { userId: u.id } });
+    return {
+      handle: u.handle, penName: u.penName, bio: u.bio,
+      avatarColorHex: u.avatarColorHex, avatarUrl: u.avatarUrl ?? null,
+      reviewCount,
+      books: books.map((b) => serializeBook(b, null)),
+    };
+  });
+
   // ===== 全站话题（clubId = null）=====
   app.get("/topics", async () => {
     const rows = await prisma.topic.findMany({
@@ -83,10 +104,11 @@ export async function socialRoutes(app: FastifyInstance) {
     if (!t) return reply.code(404).send({ error: "话题不存在" });
     return {
       id: t.id, title: t.title, body: t.body,
-      author: t.user.penName, avatarColorHex: t.user.avatarColorHex, avatarUrl: t.user.avatarUrl ?? null,
+      author: t.user.penName, handle: t.user.handle,
+      avatarColorHex: t.user.avatarColorHex, avatarUrl: t.user.avatarUrl ?? null,
       date: t.createdAt,
       replies: t.replies.map((r) => ({
-        id: r.id, author: r.user.penName, avatarColorHex: r.user.avatarColorHex,
+        id: r.id, author: r.user.penName, handle: r.user.handle, avatarColorHex: r.user.avatarColorHex,
         avatarUrl: r.user.avatarUrl ?? null, text: r.text, date: r.createdAt,
       })),
     };
@@ -102,7 +124,12 @@ export async function socialRoutes(app: FastifyInstance) {
         data: { topicId: topic.id, userId: req.userId!, text },
         include: { user: true },
       });
-      return { id: r.id, author: r.user.penName, avatarColorHex: r.user.avatarColorHex,
+      // 通知楼主有人回帖
+      if (topic.userId !== req.userId) {
+        await notify(topic.userId, "system", `${r.user.penName} 回复了你的话题「${topic.title}」`,
+          r.user.penName, { kind: "topic", id: topic.id });
+      }
+      return { id: r.id, author: r.user.penName, handle: r.user.handle, avatarColorHex: r.user.avatarColorHex,
                avatarUrl: r.user.avatarUrl ?? null, text: r.text, date: r.createdAt };
     });
 
@@ -177,7 +204,8 @@ export async function socialRoutes(app: FastifyInstance) {
       joinedByMe: me ? c.members.some((m) => m.userId === me) : false,
       isOwner: !!me && c.ownerId === me,
       members: c.members.map((m) => ({
-        penName: m.user.penName, avatarColorHex: m.user.avatarColorHex, avatarUrl: m.user.avatarUrl ?? null,
+        handle: m.user.handle, penName: m.user.penName,
+        avatarColorHex: m.user.avatarColorHex, avatarUrl: m.user.avatarUrl ?? null,
       })),
     };
   });

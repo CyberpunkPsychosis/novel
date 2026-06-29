@@ -3,7 +3,7 @@ import SwiftUI
 /// 书店：精辑推荐 + 新书上架 + 畅销榜单
 struct StoreView: View {
     @EnvironmentObject var store: LibraryStore
-    private var feature: Book? { store.book(id: "qianfu") ?? store.books.first }
+    private var feature: Book? { store.books.first { $0.featured } ?? store.books.first }
     private var newArrivals: [Book] { store.books.filter { !$0.isUserCreated } }
     /// 综合热度榜（服务器）；未拉到时退回种子书。
     private var bestsellers: [Book] {

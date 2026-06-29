@@ -12,7 +12,14 @@ struct NotificationsView: View {
                     if store.notifications.isEmpty {
                         Text("还没有通知。").font(.subheadline).foregroundStyle(Theme.sub).padding(.top, 48)
                     } else {
-                        ForEach(store.notifications) { n in NotificationRow(n: n) }
+                        ForEach(store.notifications) { n in
+                            if hasTarget(n) {
+                                NavigationLink { destination(for: n) } label: { NotificationRow(n: n) }
+                                    .buttonStyle(.plain)
+                            } else {
+                                NotificationRow(n: n)
+                            }
+                        }
                     }
                 }
                 .padding(20)
@@ -21,6 +28,27 @@ struct NotificationsView: View {
         .navigationTitle("通知")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { store.markAllNotificationsRead() }
+    }
+
+    private func hasTarget(_ n: AppNotification) -> Bool {
+        switch n.targetKind {
+        case "book": return n.targetId.flatMap { store.book(id: $0) } != nil
+        case "forkRequest": return true
+        case "topic": return n.targetId != nil
+        default: return false
+        }
+    }
+
+    /// 按通知目标决定点击去处。
+    @ViewBuilder private func destination(for n: AppNotification) -> some View {
+        switch n.targetKind {
+        case "book":
+            if let id = n.targetId, let b = store.book(id: id) { BookDetailView(book: b) }
+        case "forkRequest": ForkRequestsInboxView()
+        case "topic":
+            if let id = n.targetId { TopicDetailView(topicID: id, title: "话题") }
+        default: EmptyView()
+        }
     }
 }
 

@@ -7,8 +7,8 @@ struct CommunityView: View {
     @State private var showCreateClub = false
     private let topicColors = ["#6E7042", "#B17D6B", "#A65A3C", "#7C4A38", "#1A2332"]
 
-    /// 全站活动流（服务器真数据）；未拉到时退回演示数据。
-    private var feed: [CommunityEvent] { store.feed.isEmpty ? MockData.baseFeed : store.feed }
+    /// 全站活动流（服务器真数据）
+    private var feed: [CommunityEvent] { store.feed }
 
     var body: some View {
         ZStack {
@@ -64,14 +64,21 @@ struct CommunityView: View {
                     }
 
                     SectionHeader(title: "最近活动")
-                    VStack(spacing: 0) {
-                        ForEach(feed) { e in
-                            FeedRow(event: e)
-                            if e.id != feed.last?.id { Divider().background(Theme.line) }
+                    if feed.isEmpty {
+                        Text("还没有动态。去读书、评分、写书评或改编，就会出现在这里。")
+                            .font(.footnote).foregroundStyle(Theme.sub)
+                            .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(feed) { e in
+                                FeedRow(event: e)
+                                if e.id != feed.last?.id { Divider().background(Theme.line) }
+                            }
                         }
+                        .padding(.horizontal, 14)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
                     }
-                    .padding(.horizontal, 14)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
                 }
                 .padding(20)
             }
@@ -79,6 +86,7 @@ struct CommunityView: View {
         }
         .navigationTitle("社区")
         .navigationBarTitleDisplayMode(.inline)
+        .bookDestination(store)
         .task { await store.loadFeed(); await store.loadTopics(); await store.loadClubs() }
         .sheet(isPresented: $showCompose) {
             CommunityComposeSheet { title in
@@ -186,10 +194,12 @@ struct ClubDetailView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 14) {
                                     ForEach(Array(d.members.enumerated()), id: \.offset) { _, m in
-                                        VStack(spacing: 4) {
-                                            AvatarView(url: m.avatarUrl, colorHex: m.avatarColorHex, name: m.penName, size: 44)
-                                            Text(m.penName).font(.caption2).foregroundStyle(Theme.sub).lineLimit(1)
-                                        }.frame(width: 56)
+                                        NavigationLink { UserProfileView(handle: m.handle) } label: {
+                                            VStack(spacing: 4) {
+                                                AvatarView(url: m.avatarUrl, colorHex: m.avatarColorHex, name: m.penName, size: 44)
+                                                Text(m.penName).font(.caption2).foregroundStyle(Theme.sub).lineLimit(1)
+                                            }.frame(width: 56)
+                                        }.buttonStyle(.plain)
                                     }
                                 }
                             }
@@ -292,7 +302,13 @@ struct TopicDetailView: View {
 
     @ViewBuilder private func replyRow(_ r: TopicReplyItem) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            AvatarView(url: r.avatarUrl, colorHex: r.avatarColorHex, name: r.author, size: 30)
+            if !r.handle.isEmpty {
+                NavigationLink { UserProfileView(handle: r.handle) } label: {
+                    AvatarView(url: r.avatarUrl, colorHex: r.avatarColorHex, name: r.author, size: 30)
+                }.buttonStyle(.plain)
+            } else {
+                AvatarView(url: r.avatarUrl, colorHex: r.avatarColorHex, name: r.author, size: 30)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(r.author).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
                 Text(r.text).font(.subheadline).foregroundStyle(Theme.ink.opacity(0.85))
@@ -320,14 +336,32 @@ struct FeedRow: View {
     let event: CommunityEvent
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            AvatarView(url: event.avatarUrl, colorHex: event.avatarColorHex, name: event.who, size: 34)
-            VStack(alignment: .leading, spacing: 3) {
-                (Text(event.who).font(.subheadline.weight(.semibold)) + Text(" " + event.text).font(.subheadline))
-                    .foregroundStyle(Theme.ink)
-                Text(event.meta).font(.caption2).foregroundStyle(Theme.sub)
+            if !event.handle.isEmpty {
+                NavigationLink { UserProfileView(handle: event.handle) } label: {
+                    AvatarView(url: event.avatarUrl, colorHex: event.avatarColorHex, name: event.who, size: 34)
+                }.buttonStyle(.plain)
+            } else {
+                AvatarView(url: event.avatarUrl, colorHex: event.avatarColorHex, name: event.who, size: 34)
             }
+            content
             Spacer(minLength: 0)
         }
         .padding(.vertical, 10)
+    }
+
+    @ViewBuilder private var textBlock: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            (Text(event.who).font(.subheadline.weight(.semibold)) + Text(" " + event.text).font(.subheadline))
+                .foregroundStyle(Theme.ink)
+            Text(event.meta).font(.caption2).foregroundStyle(Theme.sub)
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        if let bid = event.bookId {
+            NavigationLink(value: bid) { textBlock }.buttonStyle(.plain)
+        } else {
+            textBlock
+        }
     }
 }

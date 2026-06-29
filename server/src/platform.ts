@@ -28,9 +28,12 @@ export async function spendCredits(
 }
 
 export async function notify(
-  userId: string, type: string, text: string, actor = ""
+  userId: string, type: string, text: string, actor = "",
+  target?: { kind: string; id: string }
 ) {
-  await prisma.notification.create({ data: { userId, type, actor, text } });
+  await prisma.notification.create({
+    data: { userId, type, actor, text, targetKind: target?.kind ?? null, targetId: target?.id ?? null },
+  });
 }
 
 // 记一条活动流事件（发布/改编/评分/书评）。

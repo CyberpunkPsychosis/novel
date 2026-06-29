@@ -73,7 +73,8 @@ export async function forkRoutes(app: FastifyInstance) {
     // 通知原作者「有人开了支线」
     if (parent.ownerId && parent.ownerId !== me.id) {
       await notify(parent.ownerId, "newBranch",
-        `${me.penName} 为《${parent.title}》开了新支线「${title}」`, me.penName);
+        `${me.penName} 为《${parent.title}》开了新支线「${title}」`, me.penName,
+        { kind: "book", id: parent.id });
     }
     await logActivity(me.id, "fork", `${label}了《${parent.title}》，开出新支线`, child.id);
     // 异步审核新支线
@@ -129,7 +130,8 @@ export async function forkRoutes(app: FastifyInstance) {
     });
     if (book.ownerId && book.ownerId !== me.id) {
       await notify(book.ownerId, "forkRequest",
-        `${me.penName} 想${b.mode}你的《${book.title}》，待你同意`, me.penName);
+        `${me.penName} 想${b.mode}你的《${book.title}》，待你同意`, me.penName,
+        { kind: "forkRequest", id: reqRow.id });
     }
     return serializeForkRequest(reqRow);
   });
@@ -192,10 +194,12 @@ export async function forkRoutes(app: FastifyInstance) {
         });
         await addCredits(req.userId!, 15, "royalty", `《${reqRow.book.title}》被${reqRow.mode}分成`);
         await notify(reqRow.requesterId, "forkApproved",
-          `你对《${reqRow.book.title}》的${reqRow.mode}申请已通过`, reqRow.book.author);
+          `你对《${reqRow.book.title}》的${reqRow.mode}申请已通过`, reqRow.book.author,
+          { kind: "book", id: reqRow.bookId });
       } else {
         await notify(reqRow.requesterId, "forkDenied",
-          `你对《${reqRow.book.title}》的${reqRow.mode}申请被拒绝`, reqRow.book.author);
+          `你对《${reqRow.book.title}》的${reqRow.mode}申请被拒绝`, reqRow.book.author,
+          { kind: "book", id: reqRow.bookId });
       }
       return serializeForkRequest(updated);
     });

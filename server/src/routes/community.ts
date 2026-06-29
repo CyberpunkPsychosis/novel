@@ -71,7 +71,8 @@ export async function communityRoutes(app: FastifyInstance) {
         liked = true;
         if (review.userId !== req.userId) {
           const me = await prisma.user.findUnique({ where: { id: req.userId! } });
-          await notify(review.userId, "system", `${me?.penName ?? "有人"} 赞了你的书评`, me?.penName ?? "");
+          await notify(review.userId, "system", `${me?.penName ?? "有人"} 赞了你的书评`, me?.penName ?? "",
+            { kind: "book", id: review.bookId });
         }
       }
       const likeCount = await prisma.reviewLike.count({ where: { reviewId: review.id } });
@@ -109,6 +110,7 @@ export async function communityRoutes(app: FastifyInstance) {
       .map((a) => ({
         id: a.id,
         who: a.user.penName,
+        handle: a.user.handle,
         avatarColorHex: a.user.avatarColorHex,
         avatarUrl: a.user.avatarUrl ?? null,
         text: a.text,
@@ -140,13 +142,14 @@ async function currentUserId(app: FastifyInstance, req: any): Promise<string | n
 
 function serializeReview(
   r: { id: string; text: string; createdAt: Date; bookId: string;
-       user: { penName: string; avatarColorHex: string; avatarUrl?: string | null };
+       user: { handle: string; penName: string; avatarColorHex: string; avatarUrl?: string | null };
        likes: { userId: string }[] },
   meId: string | null
 ) {
   return {
     id: r.id,
     author: r.user.penName,
+    handle: r.user.handle,
     avatarColorHex: r.user.avatarColorHex,
     avatarUrl: r.user.avatarUrl ?? null,
     bookID: r.bookId,

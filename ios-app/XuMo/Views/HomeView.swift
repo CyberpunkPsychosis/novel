@@ -3,7 +3,7 @@ import SwiftUI
 /// 首页：搜索 + 精选故事 + 本周必读 + 继续阅读
 struct HomeView: View {
     @EnvironmentObject var store: LibraryStore
-    private var featured: Book? { store.book(id: "huisheng") ?? store.books.first }
+    private var featured: Book? { store.books.first { $0.featured } ?? store.books.first }
     private var weekly: [Book] { store.books.filter { !$0.isUserCreated && $0.id != featured?.id } }
     private var reading: [Book] { store.inProgressBooks }
 

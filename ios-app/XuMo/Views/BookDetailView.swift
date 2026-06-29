@@ -353,7 +353,13 @@ struct ReviewRow: View {
     let onLike: () async -> Void
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            AvatarView(url: review.avatarUrl, colorHex: review.avatarColorHex, name: review.author, size: 32)
+            if !review.handle.isEmpty {
+                NavigationLink { UserProfileView(handle: review.handle) } label: {
+                    AvatarView(url: review.avatarUrl, colorHex: review.avatarColorHex, name: review.author, size: 32)
+                }.buttonStyle(.plain)
+            } else {
+                AvatarView(url: review.avatarUrl, colorHex: review.avatarColorHex, name: review.author, size: 32)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(review.author).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
                 Text(review.text).font(.subheadline).foregroundStyle(Theme.ink.opacity(0.85)).lineSpacing(3)
